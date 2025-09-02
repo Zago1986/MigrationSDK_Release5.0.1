@@ -74,8 +74,8 @@ namespace MigrationSDK
             #region EmailDomainMapping-Registration
             // Use the methods on your plan builder to add configuration and make customizations.
             _planBuilder = _planBuilder
-                .FromSourceTableauServer(_options.Source.ServerUrl, _options.Source.SiteContentUrl, _options.Source.AccessTokenName, Environment.GetEnvironmentVariable("TABLEAU_MIGRATION_SOURCE_TOKEN") ?? string.Empty)
-                .ToDestinationTableauCloud(_options.Destination.ServerUrl, _options.Destination.SiteContentUrl, _options.Destination.AccessTokenName, Environment.GetEnvironmentVariable("TABLEAU_MIGRATION_DESTINATION_TOKEN") ?? string.Empty)
+                .FromSourceTableauServer(_options.Source.ServerUrl, _options.Source.SiteContentUrl, _options.Source.AccessTokenName, _options.Source.AccessToken)
+                .ToDestinationTableauCloud(_options.Destination.ServerUrl, _options.Destination.SiteContentUrl, _options.Destination.AccessTokenName, _options.Destination.AccessToken)
                 .ForServerToCloud()
                 .WithTableauIdAuthenticationType()
                 // You can add authentication type mappings here            
