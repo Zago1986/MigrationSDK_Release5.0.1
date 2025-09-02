@@ -11,7 +11,7 @@ using Tableau.Migration.Engine;
 using Tableau.Migration.Engine.Hooks.PostPublish;
 using Tableau.Migration.Engine.Hooks.PostPublish.Default;
 
-namespace Csharp.ExampleApplication.Hooks.PostPublish
+namespace MigrationSDK.Hooks.PostPublish
 {
     #region class
     public class UpdatePermissionsHook<TPublish, TResult> : PermissionPostPublishHookBase<TPublish, TResult>

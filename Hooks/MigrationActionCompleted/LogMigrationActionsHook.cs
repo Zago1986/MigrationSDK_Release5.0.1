@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Tableau.Migration.Engine.Actions;
 using Tableau.Migration.Engine.Hooks;
 
-namespace Csharp.ExampleApplication.Hooks.MigrationActionCompleted
+namespace MigrationSDK.Hooks.MigrationActionCompleted
 {
     #region class
     public class LogMigrationActionsHook : IMigrationActionCompletedHook

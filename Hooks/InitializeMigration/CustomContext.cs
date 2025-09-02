@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Csharp.ExampleApplication.Hooks.InitializeMigration
+namespace MigrationSDK.Hooks.InitializeMigration
 {
     #region class
 

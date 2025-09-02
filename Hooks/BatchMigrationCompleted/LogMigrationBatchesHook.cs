@@ -7,7 +7,7 @@ using Tableau.Migration;
 using Tableau.Migration.Engine.Hooks;
 using Tableau.Migration.Engine.Migrators.Batch;
 
-namespace Csharp.ExampleApplication.Hooks.BatchMigrationCompleted
+namespace MigrationSDK.Hooks.BatchMigrationCompleted
 {
     #region class
     public class LogMigrationBatchesHook<T> : IContentBatchMigrationCompletedHook<T>

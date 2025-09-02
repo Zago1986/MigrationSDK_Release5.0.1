@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tableau.Migration.Engine.Hooks.PostPublish;
 
-namespace Csharp.ExampleApplication.Hooks.PostPublish
+namespace MigrationSDK.Hooks.PostPublish
 {
     #region class
     public class BulkLoggingHook<T> : BulkPostPublishHookBase<T>

@@ -1,5 +1,5 @@
 ﻿#region namespace
-namespace Csharp.ExampleApplication.Config
+namespace MigrationSDK.Config
 {
     public sealed class MyMigrationApplicationOptions
     {

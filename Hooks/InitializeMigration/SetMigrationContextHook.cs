@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Tableau.Migration.Engine.Hooks;
 
-namespace Csharp.ExampleApplication.Hooks.InitializeMigration
+namespace MigrationSDK.Hooks.InitializeMigration
 {
     #region class
 

@@ -9,7 +9,7 @@ using Tableau.Migration.Engine.Hooks.Mappings;
 using Tableau.Migration.Engine.Options;
 using Tableau.Migration.Resources;
 
-namespace Csharp.ExampleApplication.Hooks.Mappings
+namespace MigrationSDK.Hooks.Mappings
 {
     #region class
     public class UnlicensedUsersMapping : ContentMappingBase<IUser>

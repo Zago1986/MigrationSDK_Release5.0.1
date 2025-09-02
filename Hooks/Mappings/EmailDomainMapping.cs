@@ -9,7 +9,7 @@ using Tableau.Migration.Resources;
 
 #region namespace
 
-namespace Csharp.ExampleApplication.Hooks.Mappings
+namespace MigrationSDK.Hooks.Mappings
 {
     #region class
     /// <summary>

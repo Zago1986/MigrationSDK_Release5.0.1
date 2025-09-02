@@ -6,7 +6,7 @@ using Tableau.Migration.Content;
 using Tableau.Migration.Engine.Hooks.Mappings;
 using Tableau.Migration.Resources;
 
-namespace Csharp.ExampleApplication.Hooks.Mappings
+namespace MigrationSDK.Hooks.Mappings
 {
     #region class
     public class ProjectRenameMapping : ContentMappingBase<IProject>

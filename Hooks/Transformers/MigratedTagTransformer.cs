@@ -8,7 +8,7 @@ using Tableau.Migration.Content;
 using Tableau.Migration.Engine.Hooks.Transformers;
 using Tableau.Migration.Resources;
 
-namespace Csharp.ExampleApplication.Hooks.Transformers
+namespace MigrationSDK.Hooks.Transformers
 {
     #region class
     public class MigratedTagTransformer<T> : ContentTransformerBase<T> where T : IContentReference, IWithTags

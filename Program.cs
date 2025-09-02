@@ -1,19 +1,19 @@
 ﻿using System.Threading.Tasks;
-using Csharp.ExampleApplication.Config;
-using Csharp.ExampleApplication.Hooks.BatchMigrationCompleted;
-using Csharp.ExampleApplication.Hooks.Filters;
-using Csharp.ExampleApplication.Hooks.InitializeMigration;
-using Csharp.ExampleApplication.Hooks.Mappings;
-using Csharp.ExampleApplication.Hooks.MigrationActionCompleted;
-using Csharp.ExampleApplication.Hooks.PostPublish;
-using Csharp.ExampleApplication.Hooks.Transformers;
+using MigrationSDK.Config;
+using MigrationSDK.Hooks.BatchMigrationCompleted;
+using MigrationSDK.Hooks.Filters;
+using MigrationSDK.Hooks.InitializeMigration;
+using MigrationSDK.Hooks.Mappings;
+using MigrationSDK.Hooks.MigrationActionCompleted;
+using MigrationSDK.Hooks.PostPublish;
+using MigrationSDK.Hooks.Transformers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Tableau.Migration;
 using Tableau.Migration.Content;
 
 #region namespace
-namespace Csharp.ExampleApplication
+namespace MigrationSDK
 {
     public static class Program
     {

@@ -1,4 +1,4 @@
-﻿namespace Csharp.ExampleApplication.Hooks.Mappings
+﻿namespace MigrationSDK.Hooks.Mappings
 {
     public sealed class UnlicensedUsersMappingOptions
     {

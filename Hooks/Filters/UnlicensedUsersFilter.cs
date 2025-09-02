@@ -6,7 +6,7 @@ using Tableau.Migration.Engine;
 using Tableau.Migration.Engine.Hooks.Filters;
 using Tableau.Migration.Resources;
 
-namespace Csharp.ExampleApplication.Hooks.Filters
+namespace MigrationSDK.Hooks.Filters
 {
     #region class
     public class UnlicensedUsersFilter : ContentFilterBase<IUser>

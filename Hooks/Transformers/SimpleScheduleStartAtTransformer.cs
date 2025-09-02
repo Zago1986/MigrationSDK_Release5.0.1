@@ -6,7 +6,7 @@ using Tableau.Migration.Content.Schedules.Cloud;
 using Tableau.Migration.Engine.Hooks.Transformers;
 using Tableau.Migration.Resources;
 
-namespace Csharp.ExampleApplication.Hooks.Transformers
+namespace MigrationSDK.Hooks.Transformers
 {
     #region class
     public class SimpleScheduleStartAtTransformer<T> 
