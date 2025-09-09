@@ -38,6 +38,6 @@ namespace MigrationSDK.Hooks.Filters
     {
         public string WorkbookLUID { get; set; }
         public string ProjectLUID { get; set; }
-        public string ProjectDestinationLuid { get; set; }
+        public string ProjectDestinationLUID { get; set; }
     }
 }
