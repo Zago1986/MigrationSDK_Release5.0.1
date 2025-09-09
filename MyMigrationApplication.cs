@@ -119,34 +119,19 @@ namespace MigrationSDK
             _planBuilder.Filters.Add<SharedCustomViewFilter, ICustomView>();
             #endregion
 
-            // Add post-publish hooks
-            #region UpdatePermissionsHook-Registration
-            _planBuilder.Hooks.Add<UpdatePermissionsHook<IPublishableDataSource, IDataSourceDetails>>();
-            _planBuilder.Hooks.Add<UpdatePermissionsHook<IPublishableWorkbook, IWorkbookDetails>>();
-            #endregion
+            // Only migrate workbooks defined in CSV
+            _planBuilder.Filters.Add<WorkbookCsvFilter, IWorkbook>();
+            _planBuilder.Mappings.Add<WorkbookCsvProjectMapping, IWorkbook>();
 
-            #region BulkLoggingHook-Registration
-            _planBuilder.Hooks.Add<BulkLoggingHook<IUser>>();
-            #endregion
+            // Do not migrate users or groups
+            // (Do not add filters/mappings for IUser or IGroup)
 
-            // Add transformers
-            #region MigratedTagTransformer-Registration
-            _planBuilder.Transformers.Add<MigratedTagTransformer<IPublishableDataSource>, IPublishableDataSource>();
+            // Add other necessary hooks/transformers for workbooks only
             _planBuilder.Transformers.Add<MigratedTagTransformer<IPublishableWorkbook>, IPublishableWorkbook>();
-            #endregion
-
-            #region EncryptExtractTransformer-Registration
-            _planBuilder.Transformers.Add<EncryptExtractsTransformer<IPublishableDataSource>, IPublishableDataSource>();
             _planBuilder.Transformers.Add<EncryptExtractsTransformer<IPublishableWorkbook>, IPublishableWorkbook>();
-            #endregion
-
-            #region StartAtTransformer-Registration
-            _planBuilder.Transformers.Add<SimpleScheduleStartAtTransformer<ICloudExtractRefreshTask>, ICloudExtractRefreshTask>();
-            #endregion
-            
-            #region CustomViewDefaultUsersTransformer-Registration
-            _planBuilder.Transformers.Add<CustomViewExcludeDefaultUserTransformer, IPublishableCustomView>();
-            #endregion
+            _planBuilder.Hooks.Add<UpdatePermissionsHook<IPublishableWorkbook, IWorkbookDetails>>();
+            _planBuilder.Hooks.Add<BulkLoggingHook<IWorkbook>>();
+            _planBuilder.Hooks.Add<LogMigrationBatchesHook<IWorkbook>>();
 
             // Add initialize migration hooks
             #region SetCustomContext-Registration
