@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\Users\\ZAG3CA\\Documents\\Scripts\\MigrationSDK_release5.0.1\\Csharp.ExampleApplication.csproj": {}
+    "c:\\Users\\ZAG3CA\\Documents\\Scripts\\clone2\\Csharp.ExampleApplication.csproj": {}
   },
   "projects": {
-    "c:\\Users\\ZAG3CA\\Documents\\Scripts\\MigrationSDK_release5.0.1\\Csharp.ExampleApplication.csproj": {
+    "c:\\Users\\ZAG3CA\\Documents\\Scripts\\clone2\\Csharp.ExampleApplication.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\ZAG3CA\\Documents\\Scripts\\MigrationSDK_release5.0.1\\Csharp.ExampleApplication.csproj",
+        "projectUniqueName": "c:\\Users\\ZAG3CA\\Documents\\Scripts\\clone2\\Csharp.ExampleApplication.csproj",
         "projectName": "Csharp.ExampleApplication",
-        "projectPath": "c:\\Users\\ZAG3CA\\Documents\\Scripts\\MigrationSDK_release5.0.1\\Csharp.ExampleApplication.csproj",
+        "projectPath": "c:\\Users\\ZAG3CA\\Documents\\Scripts\\clone2\\Csharp.ExampleApplication.csproj",
         "packagesPath": "C:\\Users\\ZAG3CA\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\ZAG3CA\\Documents\\Scripts\\MigrationSDK_release5.0.1\\obj\\",
+        "outputPath": "c:\\Users\\ZAG3CA\\Documents\\Scripts\\clone2\\obj\\",
         "projectStyle": "PackageReference",
         "crossTargeting": true,
         "configFilePaths": [
@@ -44,6 +44,10 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "CsvHelper": {
+              "target": "Package",
+              "version": "[33.1.0, )"
+            },
             "Microsoft.Extensions.Hosting": {
               "target": "Package",
               "version": "[8.0.1, )"

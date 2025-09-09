@@ -10,6 +10,7 @@
 		<ProjectReference Include="../../src/Tableau.Migration/Tableau.Migration.csproj" />		
 	</ItemGroup>
 	<ItemGroup>
+		<PackageReference Include="CsvHelper" Version="33.1.0" />
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
 		<PackageReference Include="Tableau.Migration" Version="5.0.1" />
 	</ItemGroup>

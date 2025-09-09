@@ -2,6 +2,19 @@
   "version": 3,
   "targets": {
     "net8.0": {
+      "CsvHelper/33.1.0": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/CsvHelper.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/CsvHelper.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "Microsoft.CSharp/4.7.0": {
         "type": "package",
         "compile": {
@@ -1209,6 +1222,32 @@
     }
   },
   "libraries": {
+    "CsvHelper/33.1.0": {
+      "sha512": "kqfTOZGrn7NarNeXgjh86JcpTHUoeQDMB8t9NVa/ZtlSYiV1rxfRnQ49WaJsob4AiGrbK0XDzpyKkBwai4F8eg==",
+      "type": "package",
+      "path": "csvhelper/33.1.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "csvhelper.33.1.0.nupkg.sha512",
+        "csvhelper.nuspec",
+        "lib/net462/CsvHelper.dll",
+        "lib/net462/CsvHelper.xml",
+        "lib/net47/CsvHelper.dll",
+        "lib/net47/CsvHelper.xml",
+        "lib/net48/CsvHelper.dll",
+        "lib/net48/CsvHelper.xml",
+        "lib/net8.0/CsvHelper.dll",
+        "lib/net8.0/CsvHelper.xml",
+        "lib/net9.0/CsvHelper.dll",
+        "lib/net9.0/CsvHelper.xml",
+        "lib/netstandard2.0/CsvHelper.dll",
+        "lib/netstandard2.0/CsvHelper.xml",
+        "lib/netstandard2.1/CsvHelper.dll",
+        "lib/netstandard2.1/CsvHelper.xml"
+      ]
+    },
     "Microsoft.CSharp/4.7.0": {
       "sha512": "pTj+D3uJWyN3My70i2Hqo+OXixq3Os2D1nJ2x92FFo6sk8fYS1m1WLNTs0Dc1uPaViH0YvEEwvzddQ7y4rhXmA==",
       "type": "package",
@@ -3389,6 +3428,7 @@
   },
   "projectFileDependencyGroups": {
     "net8.0": [
+      "CsvHelper >= 33.1.0",
       "Microsoft.Extensions.Hosting >= 8.0.1",
       "Tableau.Migration >= 5.0.1"
     ]
@@ -3399,11 +3439,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\ZAG3CA\\Documents\\Scripts\\MigrationSDK_release5.0.1\\Csharp.ExampleApplication.csproj",
+      "projectUniqueName": "C:\\Users\\ZAG3CA\\Documents\\Scripts\\clone2\\Csharp.ExampleApplication.csproj",
       "projectName": "Csharp.ExampleApplication",
-      "projectPath": "C:\\Users\\ZAG3CA\\Documents\\Scripts\\MigrationSDK_release5.0.1\\Csharp.ExampleApplication.csproj",
+      "projectPath": "C:\\Users\\ZAG3CA\\Documents\\Scripts\\clone2\\Csharp.ExampleApplication.csproj",
       "packagesPath": "C:\\Users\\ZAG3CA\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\ZAG3CA\\Documents\\Scripts\\MigrationSDK_release5.0.1\\obj\\",
+      "outputPath": "C:\\Users\\ZAG3CA\\Documents\\Scripts\\clone2\\obj\\",
       "projectStyle": "PackageReference",
       "crossTargeting": true,
       "configFilePaths": [
@@ -3436,6 +3476,10 @@
       "net8.0": {
         "targetAlias": "net8.0",
         "dependencies": {
+          "CsvHelper": {
+            "target": "Package",
+            "version": "[33.1.0, )"
+          },
           "Microsoft.Extensions.Hosting": {
             "target": "Package",
             "version": "[8.0.1, )"

@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "vmrHvOBsI08=",
+  "dgSpecHash": "KYCcEKsupAk=",
   "success": true,
-  "projectFilePath": "c:\\Users\\ZAG3CA\\Documents\\Scripts\\MigrationSDK_release5.0.1\\Csharp.ExampleApplication.csproj",
+  "projectFilePath": "c:\\Users\\ZAG3CA\\Documents\\Scripts\\clone2\\Csharp.ExampleApplication.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\ZAG3CA\\.nuget\\packages\\csvhelper\\33.1.0\\csvhelper.33.1.0.nupkg.sha512",
     "C:\\Users\\ZAG3CA\\.nuget\\packages\\microsoft.csharp\\4.7.0\\microsoft.csharp.4.7.0.nupkg.sha512",
     "C:\\Users\\ZAG3CA\\.nuget\\packages\\microsoft.extensions.ambientmetadata.application\\8.10.0\\microsoft.extensions.ambientmetadata.application.8.10.0.nupkg.sha512",
     "C:\\Users\\ZAG3CA\\.nuget\\packages\\microsoft.extensions.compliance.abstractions\\8.10.0\\microsoft.extensions.compliance.abstractions.8.10.0.nupkg.sha512",
