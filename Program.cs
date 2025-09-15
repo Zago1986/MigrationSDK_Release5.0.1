@@ -116,6 +116,18 @@ namespace MigrationSDK
             services.AddScoped(typeof(LogMigrationBatchesHook<>));
             #endregion
 
+            #region ProjectLuidFilter-DI
+            services.AddScoped<ProjectLuidFilter>();
+            #endregion
+
+            #region ProjectDestinationLuidMapping-DI
+            services.AddScoped<ProjectDestinationLuidMapping>();
+            #endregion
+
+            #region UserEmailFilter-DI
+            services.AddScoped<UserEmailFilter>();
+            #endregion
+
             return services;
         }
     }

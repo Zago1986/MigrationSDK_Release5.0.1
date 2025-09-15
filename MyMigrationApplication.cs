@@ -93,6 +93,7 @@ namespace MigrationSDK
             }
 
             // Add mappings
+            /*
             #region UnlicensedUsersMapping-Registration
             _planBuilder.Mappings.Add<UnlicensedUsersMapping, IUser>();
             #endregion
@@ -108,23 +109,24 @@ namespace MigrationSDK
 
             // Add filters
             #region DefaultProjectsFilter-Registration
-            _planBuilder.Filters.Add<DefaultProjectsFilter, IProject>();
+            // _planBuilder.Filters.Add<DefaultProjectsFilter, IProject>();
             #endregion
 
             #region UnlicensedUsersFilter-Registration
-            _planBuilder.Filters.Add<UnlicensedUsersFilter, IUser>();
+            // _planBuilder.Filters.Add<UnlicensedUsersFilter, IUser>();
             #endregion
             
             #region SharedCustomViewFilter-Registration
-            _planBuilder.Filters.Add<SharedCustomViewFilter, ICustomView>();
+            // _planBuilder.Filters.Add<SharedCustomViewFilter, ICustomView>();
             #endregion
 
             // Only migrate workbooks defined in CSV
-            _planBuilder.Filters.Add<WorkbookCsvFilter, IWorkbook>();
-            _planBuilder.Mappings.Add<WorkbookCsvProjectMapping, IWorkbook>();
+            // _planBuilder.Filters.Add<WorkbookCsvFilter, IWorkbook>();
+            // _planBuilder.Mappings.Add<WorkbookCsvProjectMapping, IWorkbook>();
 
             // Do not migrate users or groups
             // (Do not add filters/mappings for IUser or IGroup)
+            */
 
             // Add other necessary hooks/transformers for workbooks only
             _planBuilder.Transformers.Add<MigratedTagTransformer<IPublishableWorkbook>, IPublishableWorkbook>();
@@ -151,6 +153,15 @@ namespace MigrationSDK
             _planBuilder.Hooks.Add<LogMigrationBatchesHook<IWorkbook>>();
             _planBuilder.Hooks.Add<LogMigrationBatchesHook<ICloudExtractRefreshTask>>();
             #endregion
+
+            // Register project-based filter (by ProjectLUID from workbooks.csv)
+            _planBuilder.Filters.Add<ProjectLuidFilter, IProject>();
+
+            // Register user filter (by UserEmail from users.csv)
+            _planBuilder.Filters.Add<UserEmailFilter, IUser>();
+
+            // Register project destination mapping (ProjectLUID -> ProjectDestinationLUID)
+            _planBuilder.Mappings.Add<ProjectDestinationLuidMapping, IProject>();
 
             // Load the previous manifest if possible
             var prevManifest = await LoadManifest(manifestPath, cancel);
