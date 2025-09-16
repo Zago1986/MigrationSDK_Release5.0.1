@@ -24,21 +24,29 @@ namespace MigrationSDK.Hooks.Mappings
             _logger = logger;
             _destinationLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var csvPath = Path.Combine(Directory.GetCurrentDirectory(), "CSV_Files", "workbooks.csv");
-            using var reader = new StreamReader(csvPath);
-            using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
-            csv.Read();
-            csv.ReadHeader();
-            var header = csv.HeaderRecord;
-            if (Array.IndexOf(header, "ProjectLUID") < 0 || Array.IndexOf(header, "ProjectDestinationLUID") < 0)
+            try
             {
-                throw new Exception("workbooks.csv must contain ProjectLUID and ProjectDestinationLUID columns.");
+                using var reader = new StreamReader(csvPath);
+                using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+                csv.Read();
+                csv.ReadHeader();
+                var header = csv.HeaderRecord;
+                if (Array.IndexOf(header, "ProjectLUID") < 0 || Array.IndexOf(header, "ProjectDestinationLUID") < 0)
+                {
+                    throw new Exception("workbooks.csv must contain ProjectLUID and ProjectDestinationLUID columns.");
+                }
+                while (csv.Read())
+                {
+                    var srcLuid = csv.GetField("ProjectLUID").Replace("\"", "").Trim();
+                    var destLuid = csv.GetField("ProjectDestinationLUID").Replace("\"", "").Trim();
+                    if (!string.IsNullOrWhiteSpace(srcLuid) && !string.IsNullOrWhiteSpace(destLuid))
+                        _destinationLookup[srcLuid] = destLuid;
+                }
             }
-            while (csv.Read())
+            catch (Exception ex)
             {
-                var srcLuid = csv.GetField("ProjectLUID").Replace("\"", "").Trim();
-                var destLuid = csv.GetField("ProjectDestinationLUID").Replace("\"", "").Trim();
-                if (!string.IsNullOrWhiteSpace(srcLuid) && !string.IsNullOrWhiteSpace(destLuid))
-                    _destinationLookup[srcLuid] = destLuid;
+                _logger?.LogError(ex, "Error reading workbooks.csv for project mapping.");
+                throw;
             }
         }
 

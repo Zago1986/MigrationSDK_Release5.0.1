@@ -13,21 +13,36 @@ namespace MigrationSDK.Hooks.Filters
     public class UserEmailFilter : ContentFilterBase<IUser>
     {
         private readonly HashSet<string> _allowedEmails;
+        private readonly ILogger<UserEmailFilter>? _logger;
 
-        public UserEmailFilter(ISharedResourcesLocalizer? localizer = null, ILogger<IContentFilter<IUser>>? logger = null)
-            : base(localizer, logger)
+        public UserEmailFilter(ILogger<UserEmailFilter>? logger = null)
+            : base(null, logger)
         {
+            _logger = logger;
             _allowedEmails = new HashSet<string>();
             var csvPath = Path.Combine(Directory.GetCurrentDirectory(), "CSV_Files", "users.csv");
-            using var reader = new StreamReader(csvPath);
-            using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
-            csv.Read();
-            csv.ReadHeader();
-            while (csv.Read())
+            try
             {
-                var email = csv.GetField("UserEmail").Replace("\"", "").Trim();
-                if (!string.IsNullOrWhiteSpace(email))
-                    _allowedEmails.Add(email);
+                using var reader = new StreamReader(csvPath);
+                using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+                csv.Read();
+                csv.ReadHeader();
+                var header = csv.HeaderRecord;
+                if (System.Array.IndexOf(header, "UserEmail") < 0)
+                {
+                    throw new System.Exception("users.csv must contain UserEmail column.");
+                }
+                while (csv.Read())
+                {
+                    var email = csv.GetField("UserEmail").Replace("\"", "").Trim();
+                    if (!string.IsNullOrWhiteSpace(email))
+                        _allowedEmails.Add(email);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                _logger?.LogError(ex, "Error reading users.csv for user filtering.");
+                throw;
             }
         }
 
