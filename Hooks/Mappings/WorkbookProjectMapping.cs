@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -18,15 +19,18 @@ namespace MigrationSDK.Hooks.Mappings
     public class WorkbookProjectMapping : ContentMappingBase<IPublishableWorkbook>
     {
         private readonly ProjectMappingStore _mappingStore;
+        private readonly IMigration _migration;
         private readonly ILogger<IContentMapping<IPublishableWorkbook>>? _logger;
 
         public WorkbookProjectMapping(
             ProjectMappingStore mappingStore,
+            IMigration migration,
             ISharedResourcesLocalizer? localizer = null, 
             ILogger<IContentMapping<IPublishableWorkbook>>? logger = null)
             : base(localizer, logger)
         {
             _mappingStore = mappingStore;
+            _migration = migration;
             _logger = logger;
         }
 
@@ -45,26 +49,24 @@ namespace MigrationSDK.Hooks.Mappings
                 return Task.FromResult<ContentMappingContext<IPublishableWorkbook>?>(ctx);
             }
 
-            if (_mappingStore.TryGetDestination(sourceProjectId, out var destProjectLuid))
+            if (!_mappingStore.TryGetDestination(sourceProjectId, out var destProjectLuid))
             {
-                // Build new location: replace the project segment with the destination project LUID
-                // The destination project must already exist with this LUID/ID
-                var newProjectLocation = sourceProjectLocation.Rename(destProjectLuid);
-                var newLocation = newProjectLocation.Append(ctx.ContentItem.Name);
-                
-                var mappedCtx = ctx.MapTo(newLocation);
-                
-                _logger?.LogInformation("Workbook '{WorkbookName}' from source project {SourceProjectId} remapped to destination project {DestProjectLuid}", 
-                    ctx.ContentItem.Name, sourceProjectId, destProjectLuid);
-                
-                return Task.FromResult<ContentMappingContext<IPublishableWorkbook>?>(mappedCtx);
+                _logger?.LogWarning("No destination project mapping found for workbook {WorkbookName} in source project {SourceProjectId}. Content will not be migrated.", 
+                    ctx.ContentItem.Name, sourceProjectId);
+                return Task.FromResult<ContentMappingContext<IPublishableWorkbook>?>(null);
             }
+
+            // Build new location using the destination project ID
+            // Create a location with just the project ID and the workbook name
+            var sourceLocation = ctx.ContentItem.Location;
+            var destProjectLocation = sourceLocation.Parent().Rename(destProjectLuid);
+            var newLocation = destProjectLocation.Append(ctx.ContentItem.Name);
+            var mappedCtx = ctx.MapTo(newLocation);
             
-            _logger?.LogWarning("No destination project mapping found for workbook {WorkbookName} in source project {SourceProjectId}. Content will not be migrated.", 
-                ctx.ContentItem.Name, sourceProjectId);
+            _logger?.LogInformation("Workbook '{WorkbookName}' from source project {SourceProjectId} remapped to destination project {DestProjectLuid} at location {NewLocation}", 
+                ctx.ContentItem.Name, sourceProjectId, destProjectLuid, newLocation);
             
-            // Return null to skip this workbook (it shouldn't reach here because of the filter, but just in case)
-            return Task.FromResult<ContentMappingContext<IPublishableWorkbook>?>(null);
+            return Task.FromResult<ContentMappingContext<IPublishableWorkbook>?>(mappedCtx);
         }
     }
 }
