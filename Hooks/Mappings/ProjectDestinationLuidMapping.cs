@@ -11,9 +11,8 @@ using Tableau.Migration.Resources;
 namespace MigrationSDK.Hooks.Mappings
 {
     /// <summary>
-    /// Skips project migration - destination projects already exist.
-    /// Returns null to prevent creating new project folders.
-    /// Content will be mapped directly to existing destination projects.
+    /// Maps source projects to existing destination projects by LUID.
+    /// NOTE: This mapping is currently not used because we skip all project migration.
     /// </summary>
     public class ProjectDestinationLuidMapping : ContentMappingBase<IProject>
     {
@@ -30,22 +29,11 @@ namespace MigrationSDK.Hooks.Mappings
             _logger = logger;
         }
 
-        public override Task<ContentMappingContext<IProject>?> MapAsync(ContentMappingContext<IProject> ctx, CancellationToken cancel)
+        public override Task<ContentMappingContext<IProject>?> MapAsync(
+            ContentMappingContext<IProject> ctx, 
+            CancellationToken cancel)
         {
-            var sourceId = ctx.ContentItem.Id.ToString();
-            
-            if (!_mappingStore.TryGetDestination(sourceId, out var destLuid))
-            {
-                _logger?.LogInformation("Source project {SourceId} ({SourceName}) not in CSV - will be skipped.", 
-                    sourceId, ctx.ContentItem.Name);
-                return Task.FromResult<ContentMappingContext<IProject>?>(null); // Skip this project
-            }
-
-            // Skip project migration - destination projects already exist
-            // Return null so the SDK doesn't create new project folders
-            _logger?.LogInformation("Source project {SourceId} ({SourceName}) mapped to destination LUID {DestLuid} - skipping project migration (dest already exists)", 
-                sourceId, ctx.ContentItem.Name, destLuid);
-            
+            // Not used - projects are skipped via SkipAllProjectsFilter
             return Task.FromResult<ContentMappingContext<IProject>?>(null);
         }
     }

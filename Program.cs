@@ -138,6 +138,8 @@ namespace MigrationSDK
 
             #region CSV project mapping store + filters/mappings
             services.AddSingleton<ProjectMappingStore>();
+            services.AddSingleton<DestinationProjectCache>();
+            services.AddScoped<LoadDestinationProjectsHook>();
             services.AddScoped<WorkbookProjectMapping>();
             services.AddScoped<DataSourceProjectMapping>();
             services.AddScoped<WorkbookCsvFilter>();
