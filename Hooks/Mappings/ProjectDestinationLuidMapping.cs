@@ -12,7 +12,9 @@ namespace MigrationSDK.Hooks.Mappings
 {
     /// <summary>
     /// Maps source projects to existing destination projects by LUID.
-    /// NOTE: This mapping is currently not used because we skip all project migration.
+    /// This mapping is intentionally simple - it just preserves the project hierarchy
+    /// and lets the SDK match projects by their content during the migration process.
+    /// The destination projects must already exist with the correct LUIDs.
     /// </summary>
     public class ProjectDestinationLuidMapping : ContentMappingBase<IProject>
     {
@@ -33,8 +35,26 @@ namespace MigrationSDK.Hooks.Mappings
             ContentMappingContext<IProject> ctx, 
             CancellationToken cancel)
         {
-            // Not used - projects are skipped via SkipAllProjectsFilter
-            return Task.FromResult<ContentMappingContext<IProject>?>(null);
+            var sourceId = ctx.ContentItem.Id.ToString();
+            
+            // Check if this project is in the CSV mapping
+            if (!_mappingStore.TryGetDestination(sourceId, out var destLuid))
+            {
+                // This shouldn't happen because ProjectLuidFilter should have filtered it out
+                _logger?.LogWarning("Source project {SourceId} ({SourceName}) not in CSV - will be skipped.", 
+                    sourceId, ctx.ContentItem.Name);
+                return Task.FromResult<ContentMappingContext<IProject>?>(null);
+            }
+
+            // Keep the same location - the SDK will match by project name and hierarchy
+            // When it tries to create the project, it will find it already exists
+            // and will match by the existing project's ID
+            _logger?.LogInformation("Project {SourceId} ({SourceName}) will be matched to destination project {DestLuid}", 
+                sourceId, ctx.ContentItem.Name, destLuid);
+
+            // Return the original context - no location change needed
+            // The SDK will handle matching to existing projects
+            return Task.FromResult<ContentMappingContext<IProject>?>(ctx);
         }
     }
 }

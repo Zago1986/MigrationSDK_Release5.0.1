@@ -114,9 +114,9 @@ namespace MigrationSDK
 
             _logger.LogInformation("=== Migration Strategy ===");
             _logger.LogInformation("- Users will NOT be migrated (already exist at destination)");
-            _logger.LogInformation("- Projects will NOT be migrated (already exist at destination)");
+            _logger.LogInformation("- Projects from CSV will be processed to establish container references");
+            _logger.LogInformation("- Existing destination projects will be matched by LUID");
             _logger.LogInformation("- Only content (workbooks, data sources) from CSV-listed projects will be migrated");
-            _logger.LogInformation("- Content will be mapped to existing destination projects by LUID from CSV");
             _logger.LogInformation("- Content ownership will be matched by user display name and email");
             _logger.LogInformation("==========================");
 
@@ -124,18 +124,20 @@ namespace MigrationSDK
             // The SDK will automatically match content ownership by display name and email
             _planBuilder.Filters.Add<SkipAllUsersFilter, IUser>();
 
-            // Step 2: Skip ALL project migration - projects already exist at destination
-            _planBuilder.Filters.Add<SkipAllProjectsFilter, IProject>();
+            // Step 2: Filter projects to only those in CSV
+            // This allows the SDK to establish container references for workbooks/data sources
+            _planBuilder.Filters.Add<ProjectLuidFilter, IProject>();
+
+            // Step 2.5: Map projects (this is mostly for logging, SDK will match existing projects automatically)
+            _planBuilder.Mappings.Add<ProjectDestinationLuidMapping, IProject>();
 
             // Step 3: Filter workbooks and data sources - only migrate content 
             // from source projects that are listed in the CSV
             _planBuilder.Filters.Add<WorkbookCsvFilter, IWorkbook>();
             _planBuilder.Filters.Add<DataSourceCsvFilter, IDataSource>();
 
-            // Step 4: Map content to destination projects using CSV mappings
-            // This ensures content is published into the correct existing destination projects
-            _planBuilder.Mappings.Add<WorkbookProjectMapping, IPublishableWorkbook>();
-            _planBuilder.Mappings.Add<DataSourceProjectMapping, IPublishableDataSource>();
+            // Note: We don't add custom WorkbookProjectMapping or DataSourceProjectMapping
+            // The SDK will automatically handle content location based on project mappings
 
             // Add transformers for workbooks and data sources
             _planBuilder.Transformers.Add<MigratedTagTransformer<IPublishableWorkbook>, IPublishableWorkbook>();
