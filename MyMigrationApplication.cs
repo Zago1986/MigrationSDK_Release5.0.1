@@ -118,7 +118,10 @@ namespace MigrationSDK
             _logger.LogInformation("- Content will be published into existing destination projects specified in CSV");
             _logger.LogInformation("==========================");
 
-            // Step 1: Filter workbooks and data sources - only migrate content 
+            // Step 1: Skip ALL project migration - destination projects must already exist
+            _planBuilder.Filters.Add<SkipAllProjectsFilter, IProject>();
+
+            // Step 2: Filter workbooks and data sources - only migrate content 
             // from source projects that are listed in the CSV
             _planBuilder.Filters.Add<WorkbookCsvFilter, IWorkbook>();
             _planBuilder.Filters.Add<DataSourceCsvFilter, IDataSource>();
