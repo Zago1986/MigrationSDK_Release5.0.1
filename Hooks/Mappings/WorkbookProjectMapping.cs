@@ -68,9 +68,10 @@ namespace MigrationSDK.Hooks.Mappings
             // Ensure destination projects are loaded
             await EnsureProjectsLoadedAsync(cancel);
 
-            // Get the source project ID
-            var sourceProjectLocation = ctx.ContentItem.Location.Parent();
-            var sourceProjectId = sourceProjectLocation.Name;
+            // Get the source project ID from the workbook's container (project) reference
+            // Cast to IMappableContainerContent to access the Container property
+            var mappableContent = ctx.ContentItem as IMappableContainerContent;
+            var sourceProjectId = mappableContent?.Container?.Id.ToString();
             
             if (string.IsNullOrEmpty(sourceProjectId))
             {
@@ -94,8 +95,8 @@ namespace MigrationSDK.Hooks.Mappings
                 var newLocation = destProjectLocation.Append(ctx.ContentItem.Name);
                 var mappedCtx = ctx.MapTo(newLocation);
                 
-                _logger?.LogInformation("Workbook '{WorkbookName}' mapped to destination project at {DestLocation}", 
-                    ctx.ContentItem.Name, destProjectLocation);
+                _logger?.LogInformation("Workbook '{WorkbookName}' (source project {SourceProjectId}) mapped to destination project {DestProjectLuid} at {DestLocation}", 
+                    ctx.ContentItem.Name, sourceProjectId, destProjectLuid, destProjectLocation);
                 
                 return mappedCtx;
             }
@@ -103,12 +104,12 @@ namespace MigrationSDK.Hooks.Mappings
             {
                 // Project not found in cache - need to query it
                 // For now, use a fallback approach with the LUID as the location
-                _logger?.LogWarning("Destination project {DestProjectLuid} not found in cache for workbook {WorkbookName}. Using LUID-based location.", 
+                _logger?.LogWarning("Destination project {DestProjectLuid} not found in cache for workbook {WorkbookName}. Using location-based fallback.", 
                     destProjectLuid, ctx.ContentItem.Name);
                 
-                // Create a location using the LUID
-                // This is a fallback and may not work correctly
-                var destLocation = sourceProjectLocation.Rename(destProjectLuid);
+                // Get current location and replace project part with destination LUID
+                var currentLocation = ctx.ContentItem.Location;
+                var destLocation = currentLocation.Parent().Rename(destProjectLuid);
                 var newLocation = destLocation.Append(ctx.ContentItem.Name);
                 var mappedCtx = ctx.MapTo(newLocation);
                 
