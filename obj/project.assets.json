@@ -3440,11 +3440,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\guilh\\OneDrive\\Documents\\Scripts\\Test\\Csharp.ExampleApplication.csproj",
+      "projectUniqueName": "C:\\Users\\guilh\\OneDrive\\Documents\\Scripts\\Test2\\Csharp.ExampleApplication.csproj",
       "projectName": "Csharp.ExampleApplication",
-      "projectPath": "C:\\Users\\guilh\\OneDrive\\Documents\\Scripts\\Test\\Csharp.ExampleApplication.csproj",
+      "projectPath": "C:\\Users\\guilh\\OneDrive\\Documents\\Scripts\\Test2\\Csharp.ExampleApplication.csproj",
       "packagesPath": "C:\\Users\\guilh\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\guilh\\OneDrive\\Documents\\Scripts\\Test\\obj\\",
+      "outputPath": "C:\\Users\\guilh\\OneDrive\\Documents\\Scripts\\Test2\\obj\\",
       "projectStyle": "PackageReference",
       "crossTargeting": true,
       "fallbackFolders": [

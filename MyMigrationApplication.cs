@@ -22,6 +22,12 @@ using Tableau.Migration.Content.Schedules.Cloud;
 using Tableau.Migration.Engine.Manifest;
 using Tableau.Migration.Engine.Pipelines;
 
+// New usings for CSV & culture
+using System.Collections.Generic;
+using System.Globalization;
+using CsvHelper;
+using CsvHelper.Configuration;
+
 #region namespace
 
 namespace MigrationSDK
@@ -35,6 +41,7 @@ namespace MigrationSDK
         private readonly MyMigrationApplicationOptions _options;
         private readonly ILogger<MyMigrationApplication> _logger;
         private readonly MigrationManifestSerializer _manifestSerializer;
+        private readonly ProjectMappingStore _projectMap;
 
         public MyMigrationApplication(
             IHostApplicationLifetime appLifetime,
@@ -42,20 +49,17 @@ namespace MigrationSDK
             IMigrator migrator,
             IOptions<MyMigrationApplicationOptions> options,
             ILogger<MyMigrationApplication> logger,
-            MigrationManifestSerializer manifestSerializer)
+            MigrationManifestSerializer manifestSerializer,
+            ProjectMappingStore projectMap)
         {
             _timer = new Stopwatch();
-
             _appLifetime = appLifetime;
-
-            // You can choose to assign an instance of the ServerToCloudMigrationPlanBuilder to help you 
-            // add your own filters, mappings, transformers or hooks.
-            // Refer to the Articles section of this documentation for more details.
             _planBuilder = planBuilder;
             _migrator = migrator;
             _options = options.Value;
             _logger = logger;
             _manifestSerializer = manifestSerializer;
+            _projectMap = projectMap;
         }
 
         public async Task StartAsync(CancellationToken cancel)
@@ -68,65 +72,55 @@ namespace MigrationSDK
             }
             var manifestPath = $"{currentFolder}/manifest.json";
 
+            // 1) Load CSV mapping and preflight report
+            var csvPath = ResolveCsvPath(_options.Csv.ProjectMapping, currentFolder);
+            await _projectMap.LoadAsync(csvPath, _logger, cancel);
+
+            if (_options.Csv.DryRun)
+            {
+                PrintCsvPreflight(_projectMap, dryRun: true);
+                Console.WriteLine("Dry-run complete. Press any key to exit");
+                Console.ReadKey();
+                _appLifetime.StopApplication();
+                return;
+            }
+
+            PrintCsvPreflight(_projectMap, dryRun: false);
+
             var startTime = DateTime.UtcNow;
             _timer.Start();
 
             #region EmailDomainMapping-Registration
-            // Use the methods on your plan builder to add configuration and make customizations.
             _planBuilder = _planBuilder
                 .FromSourceTableauServer(_options.Source.ServerUrl, _options.Source.SiteContentUrl, _options.Source.AccessTokenName, _options.Source.AccessToken)
                 .ToDestinationTableauCloud(_options.Destination.ServerUrl, _options.Destination.SiteContentUrl, _options.Destination.AccessTokenName, _options.Destination.AccessToken)
                 .ForServerToCloud()
                 .WithTableauIdAuthenticationType()
-                // You can add authentication type mappings here            
                 .WithTableauCloudUsernames<EmailDomainMapping>();
             #endregion
 
             var validationResult = _planBuilder.Validate();
-
             if (!validationResult.Success)
             {
                 _logger.LogError("Migration plan validation failed. {Errors}", validationResult.Errors);
                 Console.WriteLine("Press any key to exit");
                 Console.ReadKey();
                 _appLifetime.StopApplication();
+                return;
             }
 
-            // Add mappings
-            /*
-            #region UnlicensedUsersMapping-Registration
-            _planBuilder.Mappings.Add<UnlicensedUsersMapping, IUser>();
-            #endregion
+            // Remove LUID-folder behavior: do NOT migrate projects, and do NOT map/create projects.
+            // - appsettings.json no longer includes the 'project' content type
+            // - we do not add any IProject mappings here
 
-            #region ProjectRenameMapping-Registration
-            _planBuilder.Mappings.Add<ProjectRenameMapping, IProject>();
-            #endregion
+            // Only migrate items that have a mapping row and send them to existing destination project LUIDs.
+            // Removed CsvProjectFilter registrations to avoid interface mismatch
+            // _planBuilder.Filters.Add<CsvProjectFilter<IWorkbook>, IWorkbook>();
+            // _planBuilder.Filters.Add<CsvProjectFilter<IDataSource>, IDataSource>();
 
-            #region ChangeProjectMapping-Registration
-            _planBuilder.Mappings.Add<ChangeProjectMapping<IDataSource>, IDataSource>();
-            _planBuilder.Mappings.Add<ChangeProjectMapping<IWorkbook>, IWorkbook>();
-            #endregion
-
-            // Add filters
-            #region DefaultProjectsFilter-Registration
-            // _planBuilder.Filters.Add<DefaultProjectsFilter, IProject>();
-            #endregion
-
-            #region UnlicensedUsersFilter-Registration
-            // _planBuilder.Filters.Add<UnlicensedUsersFilter, IUser>();
-            #endregion
-            
-            #region SharedCustomViewFilter-Registration
-            // _planBuilder.Filters.Add<SharedCustomViewFilter, ICustomView>();
-            #endregion
-
-            // Only migrate workbooks defined in CSV
-            // _planBuilder.Filters.Add<WorkbookCsvFilter, IWorkbook>();
-            // _planBuilder.Mappings.Add<WorkbookCsvProjectMapping, IWorkbook>();
-
-            // Do not migrate users or groups
-            // (Do not add filters/mappings for IUser or IGroup)
-            */
+            // Remap destination ProjectId for publishable content to existing destination LUIDs from CSV
+            _planBuilder.Transformers.Add<CsvProjectRemapTransformer<IPublishableWorkbook>, IPublishableWorkbook>();
+            _planBuilder.Transformers.Add<CsvProjectRemapTransformer<IPublishableDataSource>, IPublishableDataSource>();
 
             // Add other necessary hooks/transformers for workbooks only
             _planBuilder.Transformers.Add<MigratedTagTransformer<IPublishableWorkbook>, IPublishableWorkbook>();
@@ -135,33 +129,23 @@ namespace MigrationSDK
             _planBuilder.Hooks.Add<BulkLoggingHook<IWorkbook>>();
             _planBuilder.Hooks.Add<LogMigrationBatchesHook<IWorkbook>>();
 
-            // Add initialize migration hooks
-            #region SetCustomContext-Registration
+            // Initialize migration hooks
             _planBuilder.Hooks.Add<SetMigrationContextHook>();
-            #endregion
 
-            // Add migration action completed hooks
-            #region LogMigrationActionsHook-Registration
+            // Action completed hooks
             _planBuilder.Hooks.Add<LogMigrationActionsHook>();
-            #endregion
 
-            // Add batch migration completed hooks
-            #region LogMigrationBatchesHook-Registration
+            // Batch completed hooks
             _planBuilder.Hooks.Add<LogMigrationBatchesHook<IUser>>();
             _planBuilder.Hooks.Add<LogMigrationBatchesHook<IProject>>();
             _planBuilder.Hooks.Add<LogMigrationBatchesHook<IDataSource>>();
             _planBuilder.Hooks.Add<LogMigrationBatchesHook<IWorkbook>>();
             _planBuilder.Hooks.Add<LogMigrationBatchesHook<ICloudExtractRefreshTask>>();
-            #endregion
 
-            // Register project-based filter (by ProjectLUID from workbooks.csv)
-            _planBuilder.Filters.Add<ProjectLuidFilter, IProject>();
-
-            // Register user filter (by UserEmail from users.csv)
-            _planBuilder.Filters.Add<UserEmailFilter, IUser>();
-
-            // Register project destination mapping (ProjectLUID -> ProjectDestinationLUID)
-            _planBuilder.Mappings.Add<ProjectDestinationLuidMapping, IProject>();
+            // NOTE: We intentionally remove these to avoid creating new LUID-named projects:
+            // _planBuilder.Filters.Add<ProjectLuidFilter, IProject>();
+            // _planBuilder.Filters.Add<UserEmailFilter, IUser>();
+            // _planBuilder.Mappings.Add<ProjectDestinationLuidMapping, IProject>();
 
             // Load the previous manifest if possible
             var prevManifest = await LoadManifest(manifestPath, cancel);
@@ -178,6 +162,7 @@ namespace MigrationSDK
             await _manifestSerializer.SaveAsync(result.Manifest, manifestPath);
 
             PrintResult(result);
+            PrintCsvPostReport(_projectMap, result);
 
             _logger.LogInformation($"Migration Started: {startTime}");
             _logger.LogInformation($"Migration Finished: {DateTime.UtcNow}");
@@ -261,7 +246,245 @@ namespace MigrationSDK
 
             return null;
         }
+
+        private static string ResolveCsvPath(string configuredPath, string currentFolder)
+        {
+            if (string.IsNullOrWhiteSpace(configuredPath))
+                return Path.Combine(currentFolder, "CSV_Files", "Project_Migration.csv");
+            if (Path.IsPathRooted(configuredPath))
+                return configuredPath;
+            return Path.GetFullPath(Path.Combine(currentFolder, configuredPath));
+        }
+
+        private void PrintCsvPreflight(ProjectMappingStore map, bool dryRun)
+        {
+            _logger.LogInformation("CSV Preflight: rows processed={Processed}, ready={Ready}, skipped={Skipped}",
+                map.TotalRows, map.ReadyRows, map.SkippedRows.Count);
+
+            foreach (var s in map.SkippedRows.Take(10)) // keep concise
+                _logger.LogWarning("CSV row skipped: {Reason}", s);
+
+            if (dryRun)
+                _logger.LogInformation("Dry-run: no migration executed.");
+        }
+
+        private void PrintCsvPostReport(ProjectMappingStore map, MigrationResult result)
+        {
+            var successes = result.Manifest.Entries.Count(e => !e.Errors.Any() && e.Destination is not null);
+            var failures = result.Manifest.Entries.Count(e => e.Errors.Any());
+            _logger.LogInformation("CSV Report: rows processed={Processed}, migration successes (items)={ItemSuccess}, failures (items)={ItemFailures}, csv-skipped-rows={Skipped}",
+                map.TotalRows, successes, failures, map.SkippedRows.Count);
+        }
+    }
+
+    // CSV record definition
+    internal sealed class ProjectMappingCsvRow
+    {
+        public string ProjectLUID { get; set; } = string.Empty;
+        public string ProjectDestinationLUID { get; set; } = string.Empty;
+    }
+
+    // Stores validated mappings and preflight stats
+    internal sealed class ProjectMappingStore
+    {
+        private readonly Dictionary<string, string> _map = new(StringComparer.OrdinalIgnoreCase);
+        public int TotalRows { get; private set; }
+        public int ReadyRows => _map.Count;
+        public List<string> SkippedRows { get; } = new();
+
+        public bool TryGetDestination(string sourceProjectLuid, out string destProjectLuid)
+            => _map.TryGetValue(sourceProjectLuid ?? string.Empty, out destProjectLuid!);
+
+        public async Task LoadAsync(string csvPath, ILogger logger, CancellationToken cancel)
+        {
+            if (!File.Exists(csvPath))
+                throw new FileNotFoundException($"CSV not found at {csvPath}");
+
+            using var reader = new StreamReader(csvPath);
+            using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HeaderValidated = null,
+                MissingFieldFound = null,
+                TrimOptions = TrimOptions.Trim
+            });
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in csv.GetRecords<ProjectMappingCsvRow>())
+            {
+                TotalRows++;
+                var src = (row.ProjectLUID ?? string.Empty).Trim();
+                var dst = (row.ProjectDestinationLUID ?? string.Empty).Trim();
+
+                if (string.IsNullOrEmpty(src) || string.IsNullOrEmpty(dst))
+                {
+                    SkippedRows.Add($"Row {TotalRows}: missing ProjectLUID or ProjectDestinationLUID");
+                    continue;
+                }
+                if (!seen.Add(src))
+                {
+                    SkippedRows.Add($"Row {TotalRows}: duplicate ProjectLUID '{src}'");
+                    continue;
+                }
+
+                // Accept the row
+                _map[src] = dst;
+            }
+
+            logger.LogInformation("Loaded {Ready} project mappings from CSV at {Path}", ReadyRows, csvPath);
+            await Task.CompletedTask; // maintain async signature
+        }
+    }
+
+    // Transformer: direct items to the existing destination project by LUID
+    internal sealed class CsvProjectRemapTransformer<TPublishable> : Tableau.Migration.Engine.Hooks.Transformers.IContentTransformer<TPublishable>
+        where TPublishable : class
+    {
+        private readonly ProjectMappingStore _map;
+        private readonly ILogger<CsvProjectRemapTransformer<TPublishable>> _logger;
+
+        public CsvProjectRemapTransformer(ProjectMappingStore map, ILogger<CsvProjectRemapTransformer<TPublishable>> logger)
+        {
+            _map = map;
+            _logger = logger;
+        }
+
+        // Implement the SDK-required method
+        public Task<TPublishable> ExecuteAsync(TPublishable publishable, CancellationToken cancel)
+        {
+            if (publishable is IPublishableWorkbook wb)
+            {
+                RemapProject(wb);
+            }
+            else if (publishable is IPublishableDataSource ds)
+            {
+                RemapProject(ds);
+            }
+
+            return Task.FromResult(publishable);
+        }
+
+        private void RemapProject(IPublishableWorkbook wb)
+        {
+            var srcProjectId = GetProjectIdViaReflection(wb);
+            if (string.IsNullOrWhiteSpace(srcProjectId))
+            {
+                _logger.LogError("Could not determine source project id for workbook. Item will fail to publish.");
+                return;
+            }
+
+            if (_map.TryGetDestination(srcProjectId, out var dst))
+            {
+                if (!TrySetProjectIdViaReflection(wb, dst))
+                {
+                    _logger.LogError("Failed to set destination project id for workbook. Item will fail to publish.");
+                }
+            }
+            else
+            {
+                _logger.LogError("No destination mapping found for workbook in source project {ProjectId}. Item will fail to publish.", srcProjectId);
+            }
+        }
+
+        private void RemapProject(IPublishableDataSource ds)
+        {
+            var srcProjectId = GetProjectIdViaReflection(ds);
+            if (string.IsNullOrWhiteSpace(srcProjectId))
+            {
+                _logger.LogError("Could not determine source project id for data source. Item will fail to publish.");
+                return;
+            }
+
+            if (_map.TryGetDestination(srcProjectId, out var dst))
+            {
+                if (!TrySetProjectIdViaReflection(ds, dst))
+                {
+                    _logger.LogError("Failed to set destination project id for data source. Item will fail to publish.");
+                }
+            }
+            else
+            {
+                _logger.LogError("No destination mapping found for data source in source project {ProjectId}. Item will fail to publish.", srcProjectId);
+            }
+        }
+
+        // Helpers: handle multiple SDK shapes (ProjectId, ParentProjectId, or Project.Id)
+        private static string GetProjectIdViaReflection(object obj)
+        {
+            var t = obj.GetType();
+
+            // Try ProjectId
+            var pi = t.GetProperty("ProjectId");
+            if (pi is not null)
+            {
+                var val = pi.GetValue(obj);
+                if (val is not null) return val.ToString() ?? string.Empty;
+            }
+
+            // Try ParentProjectId
+            var ppi = t.GetProperty("ParentProjectId");
+            if (ppi is not null)
+            {
+                var val = ppi.GetValue(obj);
+                if (val is not null) return val.ToString() ?? string.Empty;
+            }
+
+            // Try Project.Id
+            var projProp = t.GetProperty("Project");
+            if (projProp is not null)
+            {
+                var projObj = projProp.GetValue(obj);
+                if (projObj is not null)
+                {
+                    var idProp = projObj.GetType().GetProperty("Id");
+                    if (idProp is not null)
+                    {
+                        var val = idProp.GetValue(projObj);
+                        if (val is not null) return val.ToString() ?? string.Empty;
+                    }
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private static bool TrySetProjectIdViaReflection(object obj, string projectId)
+        {
+            var t = obj.GetType();
+
+            // Prefer ProjectId if writable
+            var pi = t.GetProperty("ProjectId");
+            if (pi is not null && pi.CanWrite)
+            {
+                pi.SetValue(obj, projectId);
+                return true;
+            }
+
+            // Try ParentProjectId if writable
+            var ppi = t.GetProperty("ParentProjectId");
+            if (ppi is not null && ppi.CanWrite)
+            {
+                ppi.SetValue(obj, projectId);
+                return true;
+            }
+
+            // Try Project.Id if inner Id is writable
+            var projProp = t.GetProperty("Project");
+            if (projProp is not null)
+            {
+                var projObj = projProp.GetValue(obj);
+                if (projObj is not null)
+                {
+                    var idProp = projObj.GetType().GetProperty("Id");
+                    if (idProp is not null && idProp.CanWrite)
+                    {
+                        idProp.SetValue(projObj, projectId);
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
     }
 }
-
 #endregion

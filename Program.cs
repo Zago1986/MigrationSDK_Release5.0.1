@@ -128,6 +128,12 @@ namespace MigrationSDK
             services.AddScoped<UserEmailFilter>();
             #endregion
 
+            #region CSV project mapping store + filters/transformers
+            services.AddSingleton<ProjectMappingStore>();
+            services.AddScoped<CsvProjectRemapTransformer<IPublishableWorkbook>>();
+            services.AddScoped<CsvProjectRemapTransformer<IPublishableDataSource>>();
+            #endregion
+
             return services;
         }
     }
