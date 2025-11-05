@@ -11,10 +11,9 @@ using Tableau.Migration.Resources;
 namespace MigrationSDK.Hooks.Mappings
 {
     /// <summary>
-    /// Maps source projects to destination project locations based on the CSV mapping.
-    /// NOTE: This mapping assumes destination projects already exist at the destination.
-    /// Source projects listed in CSV will be skipped (not created), and their content
-    /// will be published into the existing destination projects.
+    /// Skips project migration - destination projects already exist.
+    /// Returns null to prevent creating new project folders.
+    /// Content will be mapped directly to existing destination projects.
     /// </summary>
     public class ProjectDestinationLuidMapping : ContentMappingBase<IProject>
     {
@@ -37,20 +36,17 @@ namespace MigrationSDK.Hooks.Mappings
             
             if (!_mappingStore.TryGetDestination(sourceId, out var destLuid))
             {
-                _logger?.LogWarning("No ProjectDestinationLUID mapping found for source ProjectLUID: {SourceId}. Project will be skipped.", sourceId);
+                _logger?.LogInformation("Source project {SourceId} ({SourceName}) not in CSV - will be skipped.", 
+                    sourceId, ctx.ContentItem.Name);
                 return Task.FromResult<ContentMappingContext<IProject>?>(null); // Skip this project
             }
 
-            // Map to a location with the destination LUID as the project name
-            // This works because we're assuming the destination project already exists
-            // and the SDK will match by project name/path
-            var destLocation = ctx.ContentItem.Location.Rename(destLuid);
-            var mappedCtx = ctx.MapTo(destLocation);
-            
-            _logger?.LogInformation("Source project {SourceId} ({SourceName}) mapped to destination project LUID {DestLuid}", 
+            // Skip project migration - destination projects already exist
+            // Return null so the SDK doesn't create new project folders
+            _logger?.LogInformation("Source project {SourceId} ({SourceName}) mapped to destination LUID {DestLuid} - skipping project migration (dest already exists)", 
                 sourceId, ctx.ContentItem.Name, destLuid);
             
-            return Task.FromResult<ContentMappingContext<IProject>?>(mappedCtx);
+            return Task.FromResult<ContentMappingContext<IProject>?>(null);
         }
     }
 }

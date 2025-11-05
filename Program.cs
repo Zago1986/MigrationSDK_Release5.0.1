@@ -132,6 +132,10 @@ namespace MigrationSDK
             services.AddScoped<SkipAllProjectsFilter>();
             #endregion
 
+            #region SkipAllUsersFilter-DI
+            services.AddScoped<SkipAllUsersFilter>();
+            #endregion
+
             #region CSV project mapping store + filters/mappings
             services.AddSingleton<ProjectMappingStore>();
             services.AddScoped<WorkbookProjectMapping>();

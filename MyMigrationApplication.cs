@@ -113,28 +113,25 @@ namespace MigrationSDK
             }
 
             _logger.LogInformation("=== Migration Strategy ===");
-            _logger.LogInformation("- Only projects listed in CSV will be processed");
-            _logger.LogInformation("- Projects will be mapped to existing destination projects (no creation)");
-            _logger.LogInformation("- Only content (workbooks, data sources) from CSV-listed projects will be migrated");
-            _logger.LogInformation("- Content will be published into existing destination projects specified in CSV");
+            _logger.LogInformation("- Users will NOT be migrated (already exist at destination)");
+            _logger.LogInformation("- Projects will be mapped to existing destination projects by LUID from CSV");
+            _logger.LogInformation("- Project folder structure will be preserved");
+            _logger.LogInformation("- Only content from CSV-listed projects will be migrated");
+            _logger.LogInformation("- Content ownership will be matched by user display name and email");
             _logger.LogInformation("==========================");
 
-            // Step 1: Filter projects - only process projects listed in the CSV
-            // This also prevents projects NOT in the CSV from being migrated
-            _planBuilder.Filters.Add<ProjectLuidFilter, IProject>();
+            // Step 1: Skip ALL user migration - users already exist at destination
+            // The SDK will automatically match content ownership by display name and email
+            _planBuilder.Filters.Add<SkipAllUsersFilter, IUser>();
 
-            // Step 2: Map filtered projects to existing destination projects
-            // This establishes the project location mappings in the SDK's internal state
-            // Without actually creating new projects (destination projects must already exist)
+            // Step 2: Map projects to existing destination projects from CSV
+            // This skips project creation and maps to existing destination project LUIDs
             _planBuilder.Mappings.Add<ProjectDestinationLuidMapping, IProject>();
 
             // Step 3: Filter workbooks and data sources - only migrate content 
-            // from source projects that are listed in the CSV
+            // from source projects that are listed in the CSV (and their child projects)
             _planBuilder.Filters.Add<WorkbookCsvFilter, IWorkbook>();
             _planBuilder.Filters.Add<DataSourceCsvFilter, IDataSource>();
-
-            // Note: We don't need WorkbookProjectMapping or DataSourceProjectMapping
-            // because the SDK will automatically use the project mappings established above
 
             // Add transformers for workbooks and data sources
             _planBuilder.Transformers.Add<MigratedTagTransformer<IPublishableWorkbook>, IPublishableWorkbook>();
