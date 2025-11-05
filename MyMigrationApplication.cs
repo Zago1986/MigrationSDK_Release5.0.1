@@ -112,22 +112,33 @@ namespace MigrationSDK
                 return;
             }
 
-            // Do NOT migrate projects; rely on config (projects are not in contentTypes).
-            // Add filters for only CSV-mapped content:
-            // _planBuilder.Filters.Add<SkipAllProjectsFilter, IProject>(); // removed; redundant and causing compile issues
+            _logger.LogInformation("=== Migration Strategy ===");
+            _logger.LogInformation("- Projects will NOT be migrated (destination projects must already exist)");
+            _logger.LogInformation("- Only content (workbooks, data sources) from projects listed in CSV will be migrated");
+            _logger.LogInformation("- Content will be published into existing destination projects specified in CSV");
+            _logger.LogInformation("==========================");
+
+            // Step 1: Filter workbooks and data sources - only migrate content 
+            // from source projects that are listed in the CSV
             _planBuilder.Filters.Add<WorkbookCsvFilter, IWorkbook>();
             _planBuilder.Filters.Add<DataSourceCsvFilter, IDataSource>();
 
-            // Remap destination ProjectId for publishable content to existing destination LUIDs from CSV
-            _planBuilder.Transformers.Add<CsvProjectRemapTransformer<IPublishableWorkbook>, IPublishableWorkbook>();
-            _planBuilder.Transformers.Add<CsvProjectRemapTransformer<IPublishableDataSource>, IPublishableDataSource>();
+            // Step 2: Map workbooks and data sources to the correct destination project location
+            // This ensures content is published into the existing destination projects (by LUID)
+            _planBuilder.Mappings.Add<WorkbookProjectMapping, IPublishableWorkbook>();
+            _planBuilder.Mappings.Add<DataSourceProjectMapping, IPublishableDataSource>();
 
-            // Add other necessary hooks/transformers for workbooks only
+            // Add transformers for workbooks and data sources
             _planBuilder.Transformers.Add<MigratedTagTransformer<IPublishableWorkbook>, IPublishableWorkbook>();
+            _planBuilder.Transformers.Add<MigratedTagTransformer<IPublishableDataSource>, IPublishableDataSource>();
             _planBuilder.Transformers.Add<EncryptExtractsTransformer<IPublishableWorkbook>, IPublishableWorkbook>();
+            _planBuilder.Transformers.Add<EncryptExtractsTransformer<IPublishableDataSource>, IPublishableDataSource>();
+
+            // Add post-publish hooks for workbooks and data sources
             _planBuilder.Hooks.Add<UpdatePermissionsHook<IPublishableWorkbook, IWorkbookDetails>>();
+            _planBuilder.Hooks.Add<UpdatePermissionsHook<IPublishableDataSource, IDataSourceDetails>>();
             _planBuilder.Hooks.Add<BulkLoggingHook<IWorkbook>>();
-            _planBuilder.Hooks.Add<LogMigrationBatchesHook<IWorkbook>>();
+            _planBuilder.Hooks.Add<BulkLoggingHook<IDataSource>>();
 
             // Initialize migration hooks
             _planBuilder.Hooks.Add<SetMigrationContextHook>();
@@ -141,11 +152,6 @@ namespace MigrationSDK
             _planBuilder.Hooks.Add<LogMigrationBatchesHook<IDataSource>>();
             _planBuilder.Hooks.Add<LogMigrationBatchesHook<IWorkbook>>();
             _planBuilder.Hooks.Add<LogMigrationBatchesHook<ICloudExtractRefreshTask>>();
-
-            // NOTE: We intentionally remove these to avoid creating new LUID-named projects:
-            // _planBuilder.Filters.Add<ProjectLuidFilter, IProject>();
-            // _planBuilder.Filters.Add<UserEmailFilter, IUser>();
-            // _planBuilder.Mappings.Add<ProjectDestinationLuidMapping, IProject>();
 
             // Load the previous manifest if possible
             var prevManifest = await LoadManifest(manifestPath, cancel);
@@ -301,7 +307,7 @@ namespace MigrationSDK
     }
 
     // Stores validated mappings and preflight stats
-    internal sealed class ProjectMappingStore
+    public sealed class ProjectMappingStore
     {
         private readonly Dictionary<string, string> _map = new(StringComparer.OrdinalIgnoreCase);
         public int TotalRows { get; private set; }
@@ -388,159 +394,6 @@ namespace MigrationSDK
             });
 
             return Task.FromResult<IEnumerable<ContentMigrationItem<IDataSource>>?>(filtered);
-        }
-    }
-
-    // Transformer: direct items to the existing destination project by LUID
-    internal sealed class CsvProjectRemapTransformer<TPublishable> : Tableau.Migration.Engine.Hooks.Transformers.IContentTransformer<TPublishable>
-        where TPublishable : class
-    {
-        private readonly ProjectMappingStore _map;
-        private readonly ILogger<CsvProjectRemapTransformer<TPublishable>> _logger;
-
-        public CsvProjectRemapTransformer(ProjectMappingStore map, ILogger<CsvProjectRemapTransformer<TPublishable>> logger)
-        {
-            _map = map;
-            _logger = logger;
-        }
-
-        // Implement the SDK-required method
-        public Task<TPublishable> ExecuteAsync(TPublishable publishable, CancellationToken cancel)
-        {
-            if (publishable is IPublishableWorkbook wb)
-            {
-                RemapProject(wb);
-            }
-            else if (publishable is IPublishableDataSource ds)
-            {
-                RemapProject(ds);
-            }
-
-            return Task.FromResult(publishable);
-        }
-
-        private void RemapProject(IPublishableWorkbook wb)
-        {
-            var srcProjectId = GetProjectIdViaReflection(wb);
-            if (string.IsNullOrWhiteSpace(srcProjectId))
-            {
-                _logger.LogError("Could not determine source project id for workbook. Item will fail to publish.");
-                return;
-            }
-
-            if (_map.TryGetDestination(srcProjectId, out var dst))
-            {
-                if (!TrySetProjectIdViaReflection(wb, dst))
-                {
-                    _logger.LogError("Failed to set destination project id for workbook. Item will fail to publish.");
-                }
-            }
-            else
-            {
-                _logger.LogError("No destination mapping found for workbook in source project {ProjectId}. Item will fail to publish.", srcProjectId);
-            }
-        }
-
-        private void RemapProject(IPublishableDataSource ds)
-        {
-            var srcProjectId = GetProjectIdViaReflection(ds);
-            if (string.IsNullOrWhiteSpace(srcProjectId))
-            {
-                _logger.LogError("Could not determine source project id for data source. Item will fail to publish.");
-                return;
-            }
-
-            if (_map.TryGetDestination(srcProjectId, out var dst))
-            {
-                if (!TrySetProjectIdViaReflection(ds, dst))
-                {
-                    _logger.LogError("Failed to set destination project id for data source. Item will fail to publish.");
-                }
-            }
-            else
-            {
-                _logger.LogError("No destination mapping found for data source in source project {ProjectId}. Item will fail to publish.", srcProjectId);
-            }
-        }
-
-        // Helpers: handle multiple SDK shapes (ProjectId, ParentProjectId, or Project.Id)
-        private static string GetProjectIdViaReflection(object obj)
-        {
-            var t = obj.GetType();
-
-            // Try ProjectId
-            var pi = t.GetProperty("ProjectId");
-            if (pi is not null)
-            {
-                var val = pi.GetValue(obj);
-                if (val is string strVal)
-                {
-                    return strVal;
-                }
-            }
-
-            // Try ParentProjectId (for DataSources)
-            pi = t.GetProperty("ParentProjectId");
-            if (pi is not null)
-            {
-                var val = pi.GetValue(obj);
-                if (val is string strVal)
-                {
-                    return strVal;
-                }
-            }
-
-            // Try Project.Id (for newer SDK shapes)
-            pi = t.GetProperty("Id");
-            if (pi is not null)
-            {
-                var val = pi.GetValue(obj);
-                if (val is string strVal)
-                {
-                    return strVal;
-                }
-            }
-
-            return string.Empty;
-        }
-
-        private static bool TrySetProjectIdViaReflection(object obj, string projectId)
-        {
-            var t = obj.GetType();
-
-            // Prefer ProjectId if writable
-            var pi = t.GetProperty("ProjectId");
-            if (pi is not null && pi.CanWrite)
-            {
-                pi.SetValue(obj, projectId);
-                return true;
-            }
-
-            // Try ParentProjectId if writable
-            var ppi = t.GetProperty("ParentProjectId");
-            if (ppi is not null && ppi.CanWrite)
-            {
-                ppi.SetValue(obj, projectId);
-                return true;
-            }
-
-            // Try Project.Id if inner Id is writable
-            var projProp = t.GetProperty("Project");
-            if (projProp is not null)
-            {
-                var projObj = projProp.GetValue(obj);
-                if (projObj is not null)
-                {
-                    var idProp = projObj.GetType().GetProperty("Id");
-                    if (idProp is not null && idProp.CanWrite)
-                    {
-                        idProp.SetValue(projObj, projectId);
-                        return true;
-                    }
-                }
-            }
-
-            return false;
         }
     }
 }

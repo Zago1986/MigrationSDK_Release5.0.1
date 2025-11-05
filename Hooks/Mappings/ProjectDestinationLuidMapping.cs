@@ -1,65 +1,56 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using CsvHelper;
+using Microsoft.Extensions.Logging;
+using Tableau.Migration;
 using Tableau.Migration.Content;
 using Tableau.Migration.Engine;
 using Tableau.Migration.Engine.Hooks.Mappings;
 using Tableau.Migration.Resources;
-using Microsoft.Extensions.Logging;
 
 namespace MigrationSDK.Hooks.Mappings
 {
+    /// <summary>
+    /// Maps source projects to destination project locations based on the CSV mapping.
+    /// NOTE: This mapping assumes destination projects already exist at the destination.
+    /// Source projects listed in CSV will be skipped (not created), and their content
+    /// will be published into the existing destination projects.
+    /// </summary>
     public class ProjectDestinationLuidMapping : ContentMappingBase<IProject>
     {
-        private readonly Dictionary<string, string> _destinationLookup;
+        private readonly ProjectMappingStore _mappingStore;
         private readonly ILogger<IContentMapping<IProject>>? _logger;
 
-        public ProjectDestinationLuidMapping(ISharedResourcesLocalizer? localizer = null, ILogger<IContentMapping<IProject>>? logger = null)
+        public ProjectDestinationLuidMapping(
+            ProjectMappingStore mappingStore,
+            ISharedResourcesLocalizer? localizer = null, 
+            ILogger<IContentMapping<IProject>>? logger = null)
             : base(localizer, logger)
         {
+            _mappingStore = mappingStore;
             _logger = logger;
-            _destinationLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var csvPath = Path.Combine(Directory.GetCurrentDirectory(), "CSV_Files", "workbooks.csv");
-            try
-            {
-                using var reader = new StreamReader(csvPath);
-                using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
-                csv.Read();
-                csv.ReadHeader();
-                var header = csv.HeaderRecord;
-                if (Array.IndexOf(header, "ProjectLUID") < 0 || Array.IndexOf(header, "ProjectDestinationLUID") < 0)
-                {
-                    throw new Exception("workbooks.csv must contain ProjectLUID and ProjectDestinationLUID columns.");
-                }
-                while (csv.Read())
-                {
-                    var srcLuid = csv.GetField("ProjectLUID").Replace("\"", "").Trim();
-                    var destLuid = csv.GetField("ProjectDestinationLUID").Replace("\"", "").Trim();
-                    if (!string.IsNullOrWhiteSpace(srcLuid) && !string.IsNullOrWhiteSpace(destLuid))
-                        _destinationLookup[srcLuid] = destLuid;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error reading workbooks.csv for project mapping.");
-                throw;
-            }
         }
 
         public override Task<ContentMappingContext<IProject>?> MapAsync(ContentMappingContext<IProject> ctx, CancellationToken cancel)
         {
             var sourceId = ctx.ContentItem.Id.ToString();
-            if (_destinationLookup.TryGetValue(sourceId, out var destLuid))
+            
+            if (!_mappingStore.TryGetDestination(sourceId, out var destLuid))
             {
-                var mappedCtx = ctx.MapTo(ctx.ContentItem.Location.Rename(destLuid));
-                return Task.FromResult(mappedCtx);
+                _logger?.LogWarning("No ProjectDestinationLUID mapping found for source ProjectLUID: {SourceId}. Project will be skipped.", sourceId);
+                return Task.FromResult<ContentMappingContext<IProject>?>(null); // Skip this project
             }
-            _logger?.LogWarning($"No ProjectDestinationLUID mapping found for ProjectLUID: {sourceId}");
-            return Task.FromResult<ContentMappingContext<IProject>?>(null);
+
+            // Map to a location with the destination LUID as the project name
+            // This works because we're assuming the destination project already exists
+            // and the SDK will match by project name/path
+            var destLocation = ctx.ContentItem.Location.Rename(destLuid);
+            var mappedCtx = ctx.MapTo(destLocation);
+            
+            _logger?.LogInformation("Source project {SourceId} ({SourceName}) mapped to destination project LUID {DestLuid}", 
+                sourceId, ctx.ContentItem.Name, destLuid);
+            
+            return Task.FromResult<ContentMappingContext<IProject>?>(mappedCtx);
         }
     }
 }
