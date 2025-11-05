@@ -132,6 +132,8 @@ namespace MigrationSDK
             services.AddSingleton<ProjectMappingStore>();
             services.AddScoped<CsvProjectRemapTransformer<IPublishableWorkbook>>();
             services.AddScoped<CsvProjectRemapTransformer<IPublishableDataSource>>();
+            services.AddScoped<WorkbookCsvFilter>();
+            services.AddScoped<DataSourceCsvFilter>();
             #endregion
 
             return services;

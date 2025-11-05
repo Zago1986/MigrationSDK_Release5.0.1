@@ -18,15 +18,18 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Tableau.Migration;
 using Tableau.Migration.Content;
-using Tableau.Migration.Content.Schedules.Cloud;
-using Tableau.Migration.Engine.Manifest;
 using Tableau.Migration.Engine.Pipelines;
+using Tableau.Migration.Engine.Manifest; // Add back the missing namespace for MigrationManifestSerializer
+using Tableau.Migration.Engine; // Add missing namespace for ContentMigrationItem<>
 
 // New usings for CSV & culture
 using System.Collections.Generic;
 using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
+using Tableau.Migration.Content.Schedules.Cloud; // New: required for ICloudExtractRefreshTask
+using Tableau.Migration.Engine.Hooks; // New: for hook base interfaces
+using Tableau.Migration.Engine.Hooks.Filters; // ensures ContentMigrationItem<T> resolves
 
 #region namespace
 
@@ -109,14 +112,11 @@ namespace MigrationSDK
                 return;
             }
 
-            // Remove LUID-folder behavior: do NOT migrate projects, and do NOT map/create projects.
-            // - appsettings.json no longer includes the 'project' content type
-            // - we do not add any IProject mappings here
-
-            // Only migrate items that have a mapping row and send them to existing destination project LUIDs.
-            // Removed CsvProjectFilter registrations to avoid interface mismatch
-            // _planBuilder.Filters.Add<CsvProjectFilter<IWorkbook>, IWorkbook>();
-            // _planBuilder.Filters.Add<CsvProjectFilter<IDataSource>, IDataSource>();
+            // Do NOT migrate projects; rely on config (projects are not in contentTypes).
+            // Add filters for only CSV-mapped content:
+            // _planBuilder.Filters.Add<SkipAllProjectsFilter, IProject>(); // removed; redundant and causing compile issues
+            _planBuilder.Filters.Add<WorkbookCsvFilter, IWorkbook>();
+            _planBuilder.Filters.Add<DataSourceCsvFilter, IDataSource>();
 
             // Remap destination ProjectId for publishable content to existing destination LUIDs from CSV
             _planBuilder.Transformers.Add<CsvProjectRemapTransformer<IPublishableWorkbook>, IPublishableWorkbook>();
@@ -351,6 +351,46 @@ namespace MigrationSDK
         }
     }
 
+    // Filter: only migrate workbooks whose source project LUID is in CSV
+    internal sealed class WorkbookCsvFilter : Tableau.Migration.Engine.Hooks.Filters.IContentFilter<IWorkbook>
+    {
+        private readonly ProjectMappingStore _map;
+        public WorkbookCsvFilter(ProjectMappingStore map) => _map = map;
+
+        public Task<IEnumerable<ContentMigrationItem<IWorkbook>>?> ExecuteAsync(
+            IEnumerable<ContentMigrationItem<IWorkbook>> ctx,
+            CancellationToken cancel)
+        {
+            var filtered = ctx.Where(i =>
+            {
+                var srcProjectId = ((IContainerContent?)i.SourceItem)?.Container.Id.ToString() ?? string.Empty;
+                return _map.TryGetDestination(srcProjectId, out _);
+            });
+
+            return Task.FromResult<IEnumerable<ContentMigrationItem<IWorkbook>>?>(filtered);
+        }
+    }
+
+    // Filter: only migrate data sources whose source project LUID is in CSV
+    internal sealed class DataSourceCsvFilter : Tableau.Migration.Engine.Hooks.Filters.IContentFilter<IDataSource>
+    {
+        private readonly ProjectMappingStore _map;
+        public DataSourceCsvFilter(ProjectMappingStore map) => _map = map;
+
+        public Task<IEnumerable<ContentMigrationItem<IDataSource>>?> ExecuteAsync(
+            IEnumerable<ContentMigrationItem<IDataSource>> ctx,
+            CancellationToken cancel)
+        {
+            var filtered = ctx.Where(i =>
+            {
+                var srcProjectId = ((IContainerContent?)i.SourceItem)?.Container.Id.ToString() ?? string.Empty;
+                return _map.TryGetDestination(srcProjectId, out _);
+            });
+
+            return Task.FromResult<IEnumerable<ContentMigrationItem<IDataSource>>?>(filtered);
+        }
+    }
+
     // Transformer: direct items to the existing destination project by LUID
     internal sealed class CsvProjectRemapTransformer<TPublishable> : Tableau.Migration.Engine.Hooks.Transformers.IContentTransformer<TPublishable>
         where TPublishable : class
@@ -433,30 +473,31 @@ namespace MigrationSDK
             if (pi is not null)
             {
                 var val = pi.GetValue(obj);
-                if (val is not null) return val.ToString() ?? string.Empty;
-            }
-
-            // Try ParentProjectId
-            var ppi = t.GetProperty("ParentProjectId");
-            if (ppi is not null)
-            {
-                var val = ppi.GetValue(obj);
-                if (val is not null) return val.ToString() ?? string.Empty;
-            }
-
-            // Try Project.Id
-            var projProp = t.GetProperty("Project");
-            if (projProp is not null)
-            {
-                var projObj = projProp.GetValue(obj);
-                if (projObj is not null)
+                if (val is string strVal)
                 {
-                    var idProp = projObj.GetType().GetProperty("Id");
-                    if (idProp is not null)
-                    {
-                        var val = idProp.GetValue(projObj);
-                        if (val is not null) return val.ToString() ?? string.Empty;
-                    }
+                    return strVal;
+                }
+            }
+
+            // Try ParentProjectId (for DataSources)
+            pi = t.GetProperty("ParentProjectId");
+            if (pi is not null)
+            {
+                var val = pi.GetValue(obj);
+                if (val is string strVal)
+                {
+                    return strVal;
+                }
+            }
+
+            // Try Project.Id (for newer SDK shapes)
+            pi = t.GetProperty("Id");
+            if (pi is not null)
+            {
+                var val = pi.GetValue(obj);
+                if (val is string strVal)
+                {
+                    return strVal;
                 }
             }
 
