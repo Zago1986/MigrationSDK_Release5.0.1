@@ -249,11 +249,27 @@ namespace MigrationSDK
 
         private static string ResolveCsvPath(string configuredPath, string currentFolder)
         {
-            if (string.IsNullOrWhiteSpace(configuredPath))
-                return Path.Combine(currentFolder, "CSV_Files", "Project_Migration.csv");
-            if (Path.IsPathRooted(configuredPath))
-                return configuredPath;
-            return Path.GetFullPath(Path.Combine(currentFolder, configuredPath));
+            // Prefer configured path; otherwise use default relative location
+            var relative = string.IsNullOrWhiteSpace(configuredPath)
+                ? Path.Combine("CSV_Files", "Project_Migration.csv")
+                : configuredPath;
+
+            if (Path.IsPathRooted(relative))
+                return relative;
+
+            // 1) Try assembly folder (bin/...)
+            var fromAssembly = Path.GetFullPath(Path.Combine(currentFolder, relative));
+            if (File.Exists(fromAssembly))
+                return fromAssembly;
+
+            // 2) Try current working directory (project root when running via dotnet run)
+            var cwd = Directory.GetCurrentDirectory();
+            var fromCwd = Path.GetFullPath(Path.Combine(cwd, relative));
+            if (File.Exists(fromCwd))
+                return fromCwd;
+
+            // Fall back to assembly-based path (will produce a clear error with this path)
+            return fromAssembly;
         }
 
         private void PrintCsvPreflight(ProjectMappingStore map, bool dryRun)

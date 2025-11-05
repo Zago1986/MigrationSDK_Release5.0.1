@@ -22,4 +22,10 @@
 	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 	  </None>
 	</ItemGroup>
+	<ItemGroup>
+	  <!-- New: ensure CSV files are copied to bin/... preserving CSV_Files\... path -->
+	  <None Include="CSV_Files\**\*">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
+	</ItemGroup>
 </Project>
