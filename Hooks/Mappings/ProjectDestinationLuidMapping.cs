@@ -38,7 +38,7 @@ namespace MigrationSDK.Hooks.Mappings
             var sourceId = ctx.ContentItem.Id.ToString();
             
             // Check if this project is in the CSV mapping
-            if (!_mappingStore.TryGetDestination(sourceId, out var destLuid))
+            if (!_mappingStore.TryGetDestinationInfo(sourceId, out var destLuid, out var destPath))
             {
                 // This shouldn't happen because ProjectLuidFilter should have filtered it out
                 _logger?.LogWarning("Source project {SourceId} ({SourceName}) not in CSV - will be skipped.", 
@@ -46,14 +46,15 @@ namespace MigrationSDK.Hooks.Mappings
                 return Task.FromResult<ContentMappingContext<IProject>?>(null);
             }
 
-            _logger?.LogInformation("Processing project {SourceId} ({SourceName}) - will be matched to destination project {DestLuid}", 
-                sourceId, ctx.ContentItem.Name, destLuid);
+            _logger?.LogInformation("Mapping source project {SourceId} ({SourceName}) to destination project '{DestPath}' (LUID: {DestLuid})", 
+                sourceId, ctx.ContentItem.Name, destPath, destLuid);
 
-            // Return the original context without modification
-            // We're just processing the project so the SDK has container references
-            // The actual destination location mapping will be handled by WorkbookProjectMapping
-            // and DataSourceProjectMapping for the content items
-            return Task.FromResult<ContentMappingContext<IProject>?>(ctx);
+            // Map the project to the destination project's location
+            // This ensures the SDK knows where to place child content
+            var destLocation = ContentLocation.FromPath(destPath);
+            var mappedCtx = ctx.MapTo(destLocation);
+            
+            return Task.FromResult<ContentMappingContext<IProject>?>(mappedCtx);
         }
     }
 }
