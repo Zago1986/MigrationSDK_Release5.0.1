@@ -124,6 +124,11 @@ namespace MigrationSDK
             // The SDK will automatically match content ownership by display name and email
             _planBuilder.Filters.Add<SkipAllUsersFilter, IUser>();
 
+            // Step 1.5: Add user mapping for content ownership
+            // This mapping tells the SDK how to match source users to existing destination users
+            // by email/display name when updating content ownership
+            _planBuilder.Mappings.Add<DestinationUserMapping, IUser>();
+
             // Step 2: Filter projects to only those in CSV
             // This allows the SDK to establish container references for workbooks/data sources
             _planBuilder.Filters.Add<ProjectLuidFilter, IProject>();

@@ -11,10 +11,19 @@ using Tableau.Migration.Resources;
 namespace MigrationSDK.Hooks.Mappings
 {
     /// <summary>
-    /// Maps source projects to existing destination projects by LUID.
-    /// This mapping is intentionally simple - it just preserves the project hierarchy
-    /// and lets the SDK match projects by their content during the migration process.
-    /// The destination projects must already exist with the correct LUIDs.
+    /// Maps source projects to existing destination projects.
+    /// 
+    /// IMPORTANT: The Tableau Migration SDK's location system uses project names/paths, not LUIDs.
+    /// This mapping uses the destination project PATH from the CSV to tell the SDK where to place
+    /// child content. The SDK will then match these paths to existing projects at the destination
+    /// by name. Once matched, the SDK automatically uses the correct project LUID.
+    /// 
+    /// CSV Format: ProjectLUID,ProjectDestinationLUID,DestinationProjectPath
+    /// - ProjectLUID: Source project LUID
+    /// - ProjectDestinationLUID: Destination project LUID (for reference/validation)
+    /// - DestinationProjectPath: The NAME/PATH of the destination project in Tableau Cloud
+    /// 
+    /// The destination projects must already exist with the exact names specified in the CSV.
     /// </summary>
     public class ProjectDestinationLuidMapping : ContentMappingBase<IProject>
     {

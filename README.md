@@ -7,10 +7,15 @@ This application migrates Tableau content (workbooks and data sources) from Tabl
 ## Migration Strategy
 
 ### CSV-Based Project Mapping
-- Reads CSV file (ProjectLUID,ProjectDestinationLUID) from the path specified in `csv.projectMapping` in appsettings.json.
+- Reads CSV file (ProjectLUID,ProjectDestinationLUID,DestinationProjectPath) from the path specified in `csv.projectMapping` in appsettings.json.
 - **Projects are NOT migrated/created** - the destination projects must already exist in Tableau Cloud.
 - Only content (workbooks, data sources) from source projects listed in the CSV file will be migrated.
-- Content is remapped to existing destination projects identified by their LUID.
+- Content is placed in existing destination projects identified by their name/path in the CSV.
+
+### User Matching
+- **Users are NOT migrated** - they are assumed to already exist at the destination (e.g., via Azure AD import).
+- Content ownership is automatically matched by email address.
+- The SDK's `DestinationUserMapping` maps source users to destination users by email for content ownership.
 
 ### Migration Behavior
 1. **Filters content**: Only workbooks and data sources whose parent projects are listed in the CSV will be included in the migration.
@@ -30,21 +35,29 @@ Configure the following settings:
 ### CSV File Format
 The CSV file must have the following columns:
 ```
-ProjectLUID,ProjectDestinationLUID
-<source-project-luid>,<destination-project-luid>
+ProjectLUID,ProjectDestinationLUID,DestinationProjectPath
+<source-project-luid>,<destination-project-luid>,<destination-project-name>
 ```
 
 Example:
 ```
-ProjectLUID,ProjectDestinationLUID
-67890,12345
-1121-3141-5161,1234-5678-9101
-0313-2333-4353,4252-6272-8293
+ProjectLUID,ProjectDestinationLUID,DestinationProjectPath
+67890,12345,MigrationSDK
+1121-3141-5161,1234-5678-9101,DATABRICKS_TEST
+0313-2333-4353,4252-6272-8293,Oracle_TEST
 ```
 
 Where:
 - **ProjectLUID**: The LUID of the source project on Tableau Server
-- **ProjectDestinationLUID**: The LUID of the existing destination project on Tableau Cloud
+- **ProjectDestinationLUID**: The LUID of the existing destination project on Tableau Cloud (for reference/validation)
+- **DestinationProjectPath**: The **exact name** of the destination project in Tableau Cloud
+
+**Important Notes:**
+- The Tableau Migration SDK's location system uses project **names/paths**, not LUIDs directly
+- The `DestinationProjectPath` must **exactly match** the project name in Tableau Cloud
+- For nested projects, use the full path (e.g., `Parent/Child`)
+- The SDK maps by path/name and then automatically uses the correct project LUID once matched
+- Destination projects must already exist in Tableau Cloud
 
 ## How to Run
 

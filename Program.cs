@@ -136,6 +136,10 @@ namespace MigrationSDK
             services.AddScoped<SkipAllUsersFilter>();
             #endregion
 
+            #region DestinationUserMapping-DI
+            services.AddScoped<DestinationUserMapping>();
+            #endregion
+
             #region CSV project mapping store + filters/mappings
             services.AddSingleton<ProjectMappingStore>();
             services.AddSingleton<DestinationProjectCache>();
