@@ -94,12 +94,13 @@ namespace MigrationSDK.Hooks.Mappings
             }
 
             // Build the destination location using the project path from CSV
-            // Format: /{destProjectPath}/{dataSourceName}
-            var destLocation = new ContentLocation($"/{destProjectPath}/{ctx.ContentItem.Name}");
+            // The SDK expects locations without a leading slash for top-level projects
+            // Format: destProjectPath/dataSourceName
+            var destLocation = ContentLocation.FromPath($"{destProjectPath}/{ctx.ContentItem.Name}");
             var mappedCtx = ctx.MapTo(destLocation);
             
-            _logger?.LogInformation("Data source '{DataSourceName}' (source project {SourceProjectId}) mapped to destination project '{DestPath}' (LUID: {DestLuid})", 
-                ctx.ContentItem.Name, sourceProjectId, destProjectPath, destProjectLuid);
+            _logger?.LogInformation("Data source '{DataSourceName}' (source project {SourceProjectId}) mapped to destination location '{DestLocation}' (project: '{DestPath}', LUID: {DestLuid})", 
+                ctx.ContentItem.Name, sourceProjectId, destLocation, destProjectPath, destProjectLuid);
             
             return mappedCtx;
         }
