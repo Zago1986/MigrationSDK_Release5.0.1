@@ -46,14 +46,13 @@ namespace MigrationSDK.Hooks.Mappings
                 return Task.FromResult<ContentMappingContext<IProject>?>(null);
             }
 
-            // Keep the same location - the SDK will match by project name and hierarchy
-            // When it tries to create the project, it will find it already exists
-            // and will match by the existing project's ID
-            _logger?.LogInformation("Project {SourceId} ({SourceName}) will be matched to destination project {DestLuid}", 
+            _logger?.LogInformation("Processing project {SourceId} ({SourceName}) - will be matched to destination project {DestLuid}", 
                 sourceId, ctx.ContentItem.Name, destLuid);
 
-            // Return the original context - no location change needed
-            // The SDK will handle matching to existing projects
+            // Return the original context without modification
+            // We're just processing the project so the SDK has container references
+            // The actual destination location mapping will be handled by WorkbookProjectMapping
+            // and DataSourceProjectMapping for the content items
             return Task.FromResult<ContentMappingContext<IProject>?>(ctx);
         }
     }

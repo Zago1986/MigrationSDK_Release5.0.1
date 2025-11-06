@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "zQ2+qOx3lt8=",
+  "dgSpecHash": "bUJsJOtUaD0=",
   "success": true,
-  "projectFilePath": "c:\\Users\\guilh\\OneDrive\\Documents\\Scripts\\Test\\Csharp.ExampleApplication.csproj",
+  "projectFilePath": "C:\\Users\\guilh\\OneDrive\\Documents\\Scripts\\Test\\Csharp.ExampleApplication.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\guilh\\.nuget\\packages\\csvhelper\\33.1.0\\csvhelper.33.1.0.nupkg.sha512",
     "C:\\Users\\guilh\\.nuget\\packages\\microsoft.csharp\\4.7.0\\microsoft.csharp.4.7.0.nupkg.sha512",

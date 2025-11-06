@@ -65,9 +65,6 @@ namespace MigrationSDK.Hooks.Mappings
             ContentMappingContext<IPublishableDataSource> ctx, 
             CancellationToken cancel)
         {
-            // Ensure destination projects are loaded
-            await EnsureProjectsLoadedAsync(cancel);
-
             // Get the source project ID from the data source's container (project) reference
             // Cast to IMappableContainerContent to access the Container property
             var mappableContent = ctx.ContentItem as IMappableContainerContent;
@@ -88,33 +85,25 @@ namespace MigrationSDK.Hooks.Mappings
                 return null; // Skip this data source
             }
 
-            // Try to get the destination project location from cache
-            if (_projectCache.TryGetProjectLocation(destProjectLuid, out var destProjectLocation))
+            // Parse the destination LUID to ensure it's valid
+            if (!Guid.TryParse(destProjectLuid, out var destGuid))
             {
-                // Use the actual destination project location
-                var newLocation = destProjectLocation.Append(ctx.ContentItem.Name);
-                var mappedCtx = ctx.MapTo(newLocation);
-                
-                _logger?.LogInformation("Data source '{DataSourceName}' (source project {SourceProjectId}) mapped to destination project {DestProjectLuid} at {DestLocation}", 
-                    ctx.ContentItem.Name, sourceProjectId, destProjectLuid, destProjectLocation);
-                
-                return mappedCtx;
-            }
-            else
-            {
-                // Project not found in cache - need to query it
-                // For now, use a fallback approach with the LUID as the location
-                _logger?.LogWarning("Destination project {DestProjectLuid} not found in cache for data source {DataSourceName}. Using location-based fallback.", 
+                _logger?.LogError("Invalid destination project LUID {DestProjectLuid} for data source {DataSourceName}", 
                     destProjectLuid, ctx.ContentItem.Name);
-                
-                // Get current location and replace project part with destination LUID
-                var currentLocation = ctx.ContentItem.Location;
-                var destLocation = currentLocation.Parent().Rename(destProjectLuid);
-                var newLocation = destLocation.Append(ctx.ContentItem.Name);
-                var mappedCtx = ctx.MapTo(newLocation);
-                
-                return mappedCtx;
+                return null;
             }
+
+            // Build the destination location
+            // The data source should be published to the destination project
+            // We'll build a path that includes the destination project LUID
+            // Format: /{destProjectLuid}/{dataSourceName}
+            var destLocation = new ContentLocation($"/{destGuid}/{ctx.ContentItem.Name}");
+            var mappedCtx = ctx.MapTo(destLocation);
+            
+            _logger?.LogInformation("Data source '{DataSourceName}' (source project {SourceProjectId}) mapped to destination project {DestProjectLuid}", 
+                ctx.ContentItem.Name, sourceProjectId, destProjectLuid);
+            
+            return mappedCtx;
         }
     }
 }
