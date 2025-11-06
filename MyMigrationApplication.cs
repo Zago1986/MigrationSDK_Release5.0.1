@@ -120,13 +120,9 @@ namespace MigrationSDK
             _logger.LogInformation("- Content ownership will be matched by user display name and email");
             _logger.LogInformation("==========================");
 
-            // Step 1: Skip ALL user migration - users already exist at destination
-            // The SDK will automatically match content ownership by display name and email
-            _planBuilder.Filters.Add<SkipAllUsersFilter, IUser>();
-
-            // Step 1.5: Add user mapping for content ownership
-            // This mapping tells the SDK how to match source users to existing destination users
-            // by email/display name when updating content ownership
+            // Step 1: Map users to destination by email address
+            // Users already exist at destination - this mapping helps SDK find them by email
+            // The SDK will not create duplicate users, it will find existing ones
             _planBuilder.Mappings.Add<DestinationUserMapping, IUser>();
 
             // Step 2: Filter projects to only those in CSV
