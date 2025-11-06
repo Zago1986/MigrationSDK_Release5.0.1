@@ -77,31 +77,29 @@ namespace MigrationSDK.Hooks.Mappings
                 return ctx;
             }
 
-            // Look up the destination project LUID from CSV
-            if (!_mappingStore.TryGetDestination(sourceProjectId, out var destProjectLuid))
+            // Look up the destination project info from CSV
+            if (!_mappingStore.TryGetDestinationInfo(sourceProjectId, out var destProjectLuid, out var destProjectPath))
             {
                 _logger?.LogWarning("No destination project mapping found for data source {DataSourceName} in source project {SourceProjectId}. Data source will not be migrated.", 
                     ctx.ContentItem.Name, sourceProjectId);
                 return null; // Skip this data source
             }
 
-            // Parse the destination LUID to ensure it's valid
-            if (!Guid.TryParse(destProjectLuid, out var destGuid))
+            // Validate the path is not empty
+            if (string.IsNullOrEmpty(destProjectPath))
             {
-                _logger?.LogError("Invalid destination project LUID {DestProjectLuid} for data source {DataSourceName}", 
-                    destProjectLuid, ctx.ContentItem.Name);
+                _logger?.LogError("Empty destination project path for data source {DataSourceName} (dest LUID: {DestLuid})", 
+                    ctx.ContentItem.Name, destProjectLuid);
                 return null;
             }
 
-            // Build the destination location
-            // The data source should be published to the destination project
-            // We'll build a path that includes the destination project LUID
-            // Format: /{destProjectLuid}/{dataSourceName}
-            var destLocation = new ContentLocation($"/{destGuid}/{ctx.ContentItem.Name}");
+            // Build the destination location using the project path from CSV
+            // Format: /{destProjectPath}/{dataSourceName}
+            var destLocation = new ContentLocation($"/{destProjectPath}/{ctx.ContentItem.Name}");
             var mappedCtx = ctx.MapTo(destLocation);
             
-            _logger?.LogInformation("Data source '{DataSourceName}' (source project {SourceProjectId}) mapped to destination project {DestProjectLuid}", 
-                ctx.ContentItem.Name, sourceProjectId, destProjectLuid);
+            _logger?.LogInformation("Data source '{DataSourceName}' (source project {SourceProjectId}) mapped to destination project '{DestPath}' (LUID: {DestLuid})", 
+                ctx.ContentItem.Name, sourceProjectId, destProjectPath, destProjectLuid);
             
             return mappedCtx;
         }

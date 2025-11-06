@@ -77,31 +77,29 @@ namespace MigrationSDK.Hooks.Mappings
                 return ctx;
             }
 
-            // Look up the destination project LUID from CSV
-            if (!_mappingStore.TryGetDestination(sourceProjectId, out var destProjectLuid))
+            // Look up the destination project info from CSV
+            if (!_mappingStore.TryGetDestinationInfo(sourceProjectId, out var destProjectLuid, out var destProjectPath))
             {
                 _logger?.LogWarning("No destination project mapping found for workbook {WorkbookName} in source project {SourceProjectId}. Workbook will not be migrated.", 
                     ctx.ContentItem.Name, sourceProjectId);
                 return null; // Skip this workbook
             }
 
-            // Parse the destination LUID to ensure it's valid
-            if (!Guid.TryParse(destProjectLuid, out var destGuid))
+            // Validate the path is not empty
+            if (string.IsNullOrEmpty(destProjectPath))
             {
-                _logger?.LogError("Invalid destination project LUID {DestProjectLuid} for workbook {WorkbookName}", 
-                    destProjectLuid, ctx.ContentItem.Name);
+                _logger?.LogError("Empty destination project path for workbook {WorkbookName} (dest LUID: {DestLuid})", 
+                    ctx.ContentItem.Name, destProjectLuid);
                 return null;
             }
 
-            // Build the destination location
-            // The workbook should be published to the destination project
-            // We'll build a path that includes the destination project LUID
-            // Format: /{destProjectLuid}/{workbookName}
-            var destLocation = new ContentLocation($"/{destGuid}/{ctx.ContentItem.Name}");
+            // Build the destination location using the project path from CSV
+            // Format: /{destProjectPath}/{workbookName}
+            var destLocation = new ContentLocation($"/{destProjectPath}/{ctx.ContentItem.Name}");
             var mappedCtx = ctx.MapTo(destLocation);
             
-            _logger?.LogInformation("Workbook '{WorkbookName}' (source project {SourceProjectId}) mapped to destination project {DestProjectLuid}", 
-                ctx.ContentItem.Name, sourceProjectId, destProjectLuid);
+            _logger?.LogInformation("Workbook '{WorkbookName}' (source project {SourceProjectId}) mapped to destination project '{DestPath}' (LUID: {DestLuid})", 
+                ctx.ContentItem.Name, sourceProjectId, destProjectPath, destProjectLuid);
             
             return mappedCtx;
         }

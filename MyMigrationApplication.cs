@@ -318,18 +318,53 @@ namespace MigrationSDK
     {
         public string ProjectLUID { get; set; } = string.Empty;
         public string ProjectDestinationLUID { get; set; } = string.Empty;
+        public string DestinationProjectPath { get; set; } = string.Empty;
     }
 
     // Stores validated mappings and preflight stats
     public sealed class ProjectMappingStore
     {
-        private readonly Dictionary<string, string> _map = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, (string DestLuid, string DestPath)> _map = new(StringComparer.OrdinalIgnoreCase);
         public int TotalRows { get; private set; }
         public int ReadyRows => _map.Count;
         public List<string> SkippedRows { get; } = new();
 
         public bool TryGetDestination(string sourceProjectLuid, out string destProjectLuid)
-            => _map.TryGetValue(sourceProjectLuid ?? string.Empty, out destProjectLuid!);
+        {
+            if (_map.TryGetValue(sourceProjectLuid ?? string.Empty, out var tuple))
+            {
+                destProjectLuid = tuple.DestLuid;
+                return true;
+            }
+            destProjectLuid = string.Empty;
+            return false;
+        }
+
+        public bool TryGetDestinationPath(string sourceProjectLuid, out string destProjectPath)
+        {
+            if (_map.TryGetValue(sourceProjectLuid ?? string.Empty, out var tuple))
+            {
+                destProjectPath = tuple.DestPath;
+                return true;
+            }
+            destProjectPath = string.Empty;
+            return false;
+        }
+
+        public bool TryGetDestinationInfo(string sourceProjectLuid, out string destProjectLuid, out string destProjectPath)
+        {
+            if (_map.TryGetValue(sourceProjectLuid ?? string.Empty, out var tuple))
+            {
+                destProjectLuid = tuple.DestLuid;
+                destProjectPath = tuple.DestPath;
+                return true;
+            }
+            destProjectLuid = string.Empty;
+            destProjectPath = string.Empty;
+            return false;
+        }
+
+        public IEnumerable<string> GetAllSourceIds() => _map.Keys;
 
         public async Task LoadAsync(string csvPath, ILogger logger, CancellationToken cancel)
         {
@@ -350,10 +385,16 @@ namespace MigrationSDK
                 TotalRows++;
                 var src = (row.ProjectLUID ?? string.Empty).Trim();
                 var dst = (row.ProjectDestinationLUID ?? string.Empty).Trim();
+                var dstPath = (row.DestinationProjectPath ?? string.Empty).Trim();
 
                 if (string.IsNullOrEmpty(src) || string.IsNullOrEmpty(dst))
                 {
                     SkippedRows.Add($"Row {TotalRows}: missing ProjectLUID or ProjectDestinationLUID");
+                    continue;
+                }
+                if (string.IsNullOrEmpty(dstPath))
+                {
+                    SkippedRows.Add($"Row {TotalRows}: missing DestinationProjectPath");
                     continue;
                 }
                 if (!seen.Add(src))
@@ -363,7 +404,7 @@ namespace MigrationSDK
                 }
 
                 // Accept the row
-                _map[src] = dst;
+                _map[src] = (dst, dstPath);
             }
 
             logger.LogInformation("Loaded {Ready} project mappings from CSV at {Path}", ReadyRows, csvPath);
