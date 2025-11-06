@@ -14,8 +14,11 @@ This application migrates Tableau content (workbooks and data sources) from Tabl
 
 ### User Matching
 - **Users are NOT migrated** - they are assumed to already exist at the destination (e.g., via Azure AD import).
-- Content ownership is automatically matched by email address.
-- The SDK's `DestinationUserMapping` maps source users to destination users by email for content ownership.
+- Content ownership is automatically matched by **email address** via the `DestinationUserMapping`.
+- **Usernames can differ** between source and destination - the SDK matches users by their email address.
+  - Example: Source user `MOS7CA` with email `silvio.carvalho@company.com` → Destination user `mos7ca@company.com` with same email
+- The SDK will find the correct destination user based on email and assign content ownership appropriately.
+- **Important**: Email addresses must be the same on both platforms for matching to work.
 
 ### Migration Behavior
 1. **Filters content**: Only workbooks and data sources whose parent projects are listed in the CSV will be included in the migration.

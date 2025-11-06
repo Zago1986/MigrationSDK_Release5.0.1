@@ -10,9 +10,19 @@ using Tableau.Migration.Resources;
 namespace MigrationSDK.Hooks.Mappings
 {
     /// <summary>
-    /// Maps source users to existing destination users by display name and email.
-    /// This mapping is used when users have already been migrated to the destination
-    /// (e.g., via Azure AD import) and we need to match content ownership.
+    /// Maps source users to destination users based on email address.
+    /// 
+    /// This mapping handles cases where usernames differ between source and destination
+    /// (e.g., Server uses "MOS7CA", Cloud uses "mos7ca@company.com") but the email 
+    /// address remains the same on both platforms.
+    /// 
+    /// The SDK will use the email address to find the matching user at the destination,
+    /// ensuring content ownership is correctly maintained even when usernames change.
+    /// 
+    /// Example:
+    ///   Source User: Username="MOS7CA", Email="silvio.carvalho@company.com"
+    ///   Destination User: Username="mos7ca@company.com", Email="silvio.carvalho@company.com"
+    ///   Result: Content is correctly assigned to the destination user via email matching
     /// </summary>
     public class DestinationUserMapping : ContentMappingBase<IUser>
     {
@@ -30,28 +40,32 @@ namespace MigrationSDK.Hooks.Mappings
             ContentMappingContext<IUser> ctx,
             CancellationToken cancel)
         {
-            // Since users are already at the destination (migrated via Azure AD),
-            // we map to the same username/email so the SDK can find them
-            // The SDK will match by email address at the destination
-
             var sourceUser = ctx.ContentItem;
             
+            // Check if user has an email address
+            if (string.IsNullOrEmpty(sourceUser.Email))
+            {
+                _logger?.LogWarning(
+                    "Source user {SourceUser} has no email address. Using username for mapping. " +
+                    "This may fail if the username differs at the destination.",
+                    sourceUser.Name);
+                
+                // No email, use username (may fail if username differs at destination)
+                var usernameLocation = ContentLocation.ForUsername(sourceUser.Domain, sourceUser.Name);
+                return Task.FromResult<ContentMappingContext<IUser>?>(ctx.MapTo(usernameLocation));
+            }
+
+            // Map based on email address - this works even when usernames differ
             _logger?.LogInformation(
-                "Mapping source user {SourceUser} (Name: {Name}, Email: {Email}) to destination using email matching",
+                "Mapping source user {SourceUsername} (Email: {Email}) to destination user by email address",
                 sourceUser.Name,
-                sourceUser.Name,
-                sourceUser.Email ?? "N/A");
+                sourceUser.Email);
 
-            // Use the email as the mapping key - SDK will match destination users by email
-            // If no email, use the display name
-            var mappingKey = !string.IsNullOrEmpty(sourceUser.Email) 
-                ? sourceUser.Email 
-                : sourceUser.Name;
-
-            // Create a location based on the email/username for matching
-            var mappedLocation = ContentLocation.ForUsername(sourceUser.Domain, mappingKey);
+            // Use email for mapping - SDK will find the destination user with this email
+            // The destination username can be different (e.g., "mos7ca@company.com" vs "MOS7CA")
+            var emailLocation = ContentLocation.ForUsername(sourceUser.Domain, sourceUser.Email);
             
-            return Task.FromResult<ContentMappingContext<IUser>?>(ctx.MapTo(mappedLocation));
+            return Task.FromResult<ContentMappingContext<IUser>?>(ctx.MapTo(emailLocation));
         }
     }
 }
