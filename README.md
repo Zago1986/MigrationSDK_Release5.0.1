@@ -8,9 +8,21 @@ This application migrates Tableau content (workbooks and data sources) from Tabl
 
 ### CSV-Based Project Mapping
 - Reads CSV file (ProjectLUID,ProjectDestinationLUID,DestinationProjectPath) from the path specified in `csv.projectMapping` in appsettings.json.
-- **Projects are NOT migrated/created** - the destination projects must already exist in Tableau Cloud.
+- **Source projects ARE migrated** - they are created as subfolders inside the destination parent projects.
+- The destination **parent projects** specified in the CSV must already exist in Tableau Cloud.
 - Only content (workbooks, data sources) from source projects listed in the CSV file will be migrated.
-- Content is placed in existing destination projects identified by their name/path in the CSV.
+- **Project Structure Preserved**: Source projects are created inside destination projects, maintaining the hierarchy:
+  ```
+  Destination Project (existing in Cloud)
+  └── Source Project (migrated from Server)
+      └── Workbooks and Data Sources
+  ```
+
+**Example**:
+- CSV specifies: `DestinationProjectPath = MigrationSDK`
+- Source project: `DATABRICKS_TEST`
+- Result: Creates `MigrationSDK/DATABRICKS_TEST` in Tableau Cloud
+- All content placed in `MigrationSDK/DATABRICKS_TEST`
 
 ### User Matching
 - **Users are NOT migrated** - they are assumed to already exist at the destination (e.g., via Azure AD import).
@@ -21,10 +33,12 @@ This application migrates Tableau content (workbooks and data sources) from Tabl
 - **Important**: Email addresses must be the same on both platforms for matching to work.
 
 ### Migration Behavior
-1. **Filters content**: Only workbooks and data sources whose parent projects are listed in the CSV will be included in the migration.
-2. **Remaps location**: Content is published into the destination project specified in the CSV (by ProjectDestinationLUID).
-3. **Prerequisite**: Destination projects must already exist at the destination with the LUIDs specified in the CSV.
-4. **Failure handling**: If a destination project LUID does not exist, the publish will fail for those items and be reported in the migration results.
+1. **Filters projects**: Only projects listed in the CSV will be migrated from the source.
+2. **Creates project hierarchy**: Source projects are created as subfolders inside the destination parent projects.
+3. **Filters content**: Only workbooks and data sources whose parent projects are listed in the CSV will be included.
+4. **Places content**: Content is published into the newly created source project folder (which is inside the destination parent project).
+5. **Prerequisite**: Destination **parent** projects must already exist with the names specified in the CSV.
+6. **Failure handling**: If a destination parent project doesn't exist, the migration will fail for those items.
 
 ## Configuration
 

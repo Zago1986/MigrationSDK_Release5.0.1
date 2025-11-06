@@ -11,19 +11,29 @@ using Tableau.Migration.Resources;
 namespace MigrationSDK.Hooks.Mappings
 {
     /// <summary>
-    /// Maps source projects to existing destination projects.
+    /// Maps source projects to be created as subfolders inside existing destination projects.
     /// 
-    /// IMPORTANT: The Tableau Migration SDK's location system uses project names/paths, not LUIDs.
-    /// This mapping uses the destination project PATH from the CSV to tell the SDK where to place
-    /// child content. The SDK will then match these paths to existing projects at the destination
-    /// by name. Once matched, the SDK automatically uses the correct project LUID.
+    /// IMPORTANT: This mapping preserves the source project structure by creating source projects
+    /// as child folders inside the destination projects specified in the CSV.
+    /// 
+    /// Example:
+    /// - CSV: ProjectLUID=ABC, DestinationProjectPath=MigrationSDK
+    /// - Source Project: DATABRICKS_TEST (name from Tableau Server)
+    /// - Result: Creates MigrationSDK/DATABRICKS_TEST in Tableau Cloud
+    /// - Content: Workbooks/data sources placed in MigrationSDK/DATABRICKS_TEST
+    /// 
+    /// Structure:
+    ///   Destination Project (existing in Cloud)
+    ///   └── Source Project (created during migration)
+    ///       └── Workbooks and Data Sources
     /// 
     /// CSV Format: ProjectLUID,ProjectDestinationLUID,DestinationProjectPath
     /// - ProjectLUID: Source project LUID
     /// - ProjectDestinationLUID: Destination project LUID (for reference/validation)
-    /// - DestinationProjectPath: The NAME/PATH of the destination project in Tableau Cloud
+    /// - DestinationProjectPath: The NAME/PATH of the parent destination project in Tableau Cloud
     /// 
-    /// The destination projects must already exist with the exact names specified in the CSV.
+    /// The destination parent projects must already exist with the exact names specified in the CSV.
+    /// The source project folders will be created automatically during migration.
     /// </summary>
     public class ProjectDestinationLuidMapping : ContentMappingBase<IProject>
     {
@@ -55,12 +65,16 @@ namespace MigrationSDK.Hooks.Mappings
                 return Task.FromResult<ContentMappingContext<IProject>?>(null);
             }
 
-            _logger?.LogInformation("Mapping source project {SourceId} ({SourceName}) to destination project '{DestPath}' (LUID: {DestLuid})", 
-                sourceId, ctx.ContentItem.Name, destPath, destLuid);
+            // Create the full destination path: DestinationProject/SourceProjectName
+            // This preserves the source project structure inside the destination project
+            var sourceProjectName = ctx.ContentItem.Name;
+            var fullDestPath = $"{destPath}/{sourceProjectName}";
+            
+            _logger?.LogInformation("Mapping source project {SourceId} ({SourceName}) to destination path '{FullDestPath}' (parent: {DestPath})", 
+                sourceId, sourceProjectName, fullDestPath, destPath);
 
-            // Map the project to the destination project's location
-            // This ensures the SDK knows where to place child content
-            var destLocation = ContentLocation.FromPath(destPath);
+            // Map the project to be created as a subfolder inside the destination project
+            var destLocation = ContentLocation.FromPath(fullDestPath);
             var mappedCtx = ctx.MapTo(destLocation);
             
             return Task.FromResult<ContentMappingContext<IProject>?>(mappedCtx);
