@@ -120,9 +120,12 @@ namespace MigrationSDK
             _logger.LogInformation("- Content ownership will be matched by user display name and email");
             _logger.LogInformation("==========================");
 
-            // Step 1: Map users to destination by email address
-            // Users already exist at destination - this mapping helps SDK find them by email
-            // The SDK will not create duplicate users, it will find existing ones
+            // Step 1: Skip ALL user migration - users already exist at destination
+            // We will use TableauCloudUsernameMapping to handle content ownership
+            _planBuilder.Filters.Add<SkipAllUsersFilter, IUser>();
+            
+            // Step 1.5: Use TableauCloudUsernameMapping for email-based content ownership
+            // This is a built-in SDK feature that maps usernames to emails for Tableau Cloud
             _planBuilder.Mappings.Add<DestinationUserMapping, IUser>();
 
             // Step 2: Filter projects to only those in CSV

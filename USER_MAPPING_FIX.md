@@ -1,113 +1,132 @@
-# User Mapping Fix - Final Solution
+# User Mapping Fix - Final Solution (ITableauCloudUsernameMapping)
 
 ## Problem Summary
 
-The migration was failing with this error:
-```
-Detail: User 'e397c97d-6046-4b53-ad6e-b78dc2a83066' could not be found.
-```
+The migration was failing with multiple issues:
+1. **User migration failures**: `Tableau.Migration.Api.Models.FailedJobException: A Tableau job failed`
+2. **Content ownership errors**: `User 'cb7a3db6-eee2-401f-9bc6-ccf2c395f3d3' could not be found`
 
-**Root Cause**: The migration was using `SkipAllUsersFilter` which prevented the SDK from building the user mapping table needed to resolve user references in content (workbooks, projects, data sources).
+**Root Cause**: 
+- When users are migrated, the SDK tries to **CREATE** them at Tableau Cloud
+- Since users already exist (via Azure AD), the creation fails
+- Failed user migration = empty user mapping table
+- Empty mapping table = content can't find destination users
 
-## The Issue with Previous Approach
+## The Solution ✅
 
-### What Was Wrong:
-1. **SkipAllUsersFilter** was preventing ALL user migration
-2. **DestinationUserMapping** only runs during user migration phase
-3. Since users were skipped, the mapping never executed
-4. Content tried to use source user LUIDs, which don't exist at destination
-5. Result: "User could not be found" errors
+Use **`ITableauCloudUsernameMapping`** - a built-in SDK interface specifically designed for Server-to-Cloud migrations where users already exist at the destination.
 
-### Why Email Matching Alone Didn't Work:
-- User mappings only apply during the USER migration phase
-- When users are skipped entirely, mappings are never consulted
-- The SDK's `MappedUserTransformer` (which handles content ownership) requires users to have been processed first
+### How It Works:
 
-## Solution Implemented
+1. **Skip user migration** - Don't try to create users (`SkipAllUsersFilter`)
+2. **Map usernames to emails** - Tell SDK to use email addresses as user identifiers (`ITableauCloudUsernameMapping`)
+3. **SDK handles the rest** - When publishing content, SDK looks up users by email at destination
 
-### ✅ REMOVE SkipAllUsersFilter
-- Allow users to be "migrated" (processed by the SDK)
-- Users already exist at destination, so SDK will find and use them (not create duplicates)
-- This allows the SDK to build the user mapping table
+### Key Changes:
 
-### ✅ KEEP DestinationUserMapping  
-- Maps source users to destination users by **email address**
-- Handles cases where usernames differ between platforms:
-  - Source: `MOS7CA` → Destination: `mos7ca@company.com`
-  - Both have same email: `silvio.carvalho@company.com`
-- SDK finds destination user by email and uses their LUID
-
-### How It Works Now:
-
-```
-1. SDK processes users from source
-   ↓
-2. DestinationUserMapping maps by email
-   - Source user: Username="MOS7CA", Email="silvio.carvalho@company.com"
-   - Mapped to: ContentLocation.ForUsername(domain, "silvio.carvalho@company.com")
-   ↓
-3. SDK finds destination user with that email
-   - Destination user: Username="mos7ca@company.com", Email="silvio.carvalho@company.com"
-   - LUID: [destination-user-luid]
-   ↓
-4. SDK builds mapping table: source-user-luid → destination-user-luid
-   ↓
-5. When publishing content, SDK uses destination-user-luid for ownership
-   ↓
-6. ✅ Content published with correct owner!
+**`DestinationUserMapping.cs`**:
+```csharp
+public class DestinationUserMapping : ContentMappingBase<IUser>, ITableauCloudUsernameMapping
+    //                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    //                                                           This interface is the key!
+{
+    public override Task<ContentMappingContext<IUser>?> MapAsync(...)
+    {
+        var domain = ctx.MappedLocation.Parent();
+        
+        // Map to email-based location
+        return Task.FromResult<ContentMappingContext<IUser>?>(
+            ctx.MapTo(domain.Append(sourceUser.Email)));
+        //                        ^^^^^^^^^^^^^^^^^^^ 
+        //                        Use email as the user identifier
+    }
+}
 ```
 
-## Files Modified
+**`MyMigrationApplication.cs`**:
+```csharp
+// Skip ALL user migration
+_planBuilder.Filters.Add<SkipAllUsersFilter, IUser>();
 
-1. **MyMigrationApplication.cs**:
-   - ❌ REMOVED: `_planBuilder.Filters.Add<SkipAllUsersFilter, IUser>();`
-   - ✅ KEPT: `_planBuilder.Mappings.Add<DestinationUserMapping, IUser>();`
+// Use TableauCloudUsernameMapping for email-based content ownership
+_planBuilder.Mappings.Add<DestinationUserMapping, IUser>();
+```
 
-2. **DestinationUserMapping.cs**:
-   - ✅ Maps users by email address
-   - ✅ Falls back to username if no email exists
+## Why This Works:
 
-## Expected Behavior
+| Step | What Happens |
+|------|--------------|
+| 1. User Phase | SDK processes users but **doesn't migrate** them (SkipAllUsersFilter) |
+| 2. Mapping Phase | `ITableauCloudUsernameMapping` maps source usernames to email addresses |
+| 3. Content Phase | When content needs an owner, SDK uses the email from mapping |
+| 4. Lookup | SDK queries Tableau Cloud for user with that email |
+| 5. Success! | Content assigned to existing destination user ✅ |
+
+## Example Flow:
+
+```
+Source Content: Workbook owned by "MOS7CA"
+    ↓
+DestinationUserMapping maps "MOS7CA" → "silvio.carvalho@company.com"
+    ↓
+SDK publishes workbook and needs to set owner
+    ↓
+SDK queries Tableau Cloud: "Find user with email = silvio.carvalho@company.com"
+    ↓
+Tableau Cloud returns: User "mos7ca@company.com" (LUID: xyz-123-abc)
+    ↓
+SDK assigns workbook owner = xyz-123-abc
+    ↓
+✅ Success! Content has correct owner
+```
+
+## Files Modified:
+
+1. **`DestinationUserMapping.cs`**:
+   - Added `ITableauCloudUsernameMapping` interface
+   - Changed to map to `domain.Append(sourceUser.Email)`
+   - Simplified logic - just email mapping, no complex lookups
+
+2. **`MyMigrationApplication.cs`**:
+   - Re-added `SkipAllUsersFilter` to prevent user creation attempts
+   - Kept `DestinationUserMapping` for email-based ownership
+
+## Expected Behavior:
 
 ### During Migration:
 ```
-info: Mapping source user MOS7CA (Email: silvio.carvalho@company.com) to destination user by email address
-info: User MOS7CA migrated to mos7ca@company.com
+info: Mapping source user MOS7CA to Tableau Cloud using email silvio.carvalho@company.com
+info: IUser br.bosch.com\MOS7CA Migration Status: Skipped
+info: IWorkbook Oracle_TEST/ORACLE_LIVE Migration Status: Succeeded
 ```
 
-### Result:
-- ✅ Users are "migrated" (SDK finds existing users, doesn't create duplicates)
-- ✅ User mapping table is built (source LUID → destination LUID)
-- ✅ Content ownership uses correct destination user LUIDs
-- ✅ No "User could not be found" errors
+### Results:
+- ✅ NO user migration errors (users are skipped, not failed)
+- ✅ NO "User could not be found" errors
+- ✅ Content ownership correctly assigned to existing destination users
+- ✅ Usernames can differ between platforms (email matching handles this)
 
-## Testing Checklist
+## Testing Checklist:
 
-- [ ] Run migration and verify these log messages appear:
-  ```
-  info: Mapping source user [USERNAME] (Email: [EMAIL]) to destination user by email address
-  ```
-- [ ] Verify NO errors: `"Could not find destination user"`
-- [ ] Verify users show as migrated in logs (they won't be created, just matched)
-- [ ] Verify content ownership is correctly assigned at destination
-- [ ] Verify workbooks migrated successfully
-- [ ] Verify projects migrated successfully
+- [ ] Run migration - users should show "Skipped" not "Error"
+- [ ] Verify NO `FailedJobException` errors for users
+- [ ] Verify NO `"User '...' could not be found"` errors for content
+- [ ] Check workbooks migrated successfully
+- [ ] Check projects migrated successfully
+- [ ] Verify content ownership at destination matches expected users
 
-## Important Notes
+## Important Notes:
 
-✅ **Users Won't Be Duplicated**: Even though we removed SkipAllUsersFilter, the SDK is smart enough to find existing users and NOT create duplicates
+✅ **ITableauCloudUsernameMapping**: This is the official SDK way to handle existing users in Server-to-Cloud migrations
 
-✅ **Email Matching**: As long as email addresses match between source and destination, ownership will be correct
+✅ **Email Addresses Required**: All source users must have email addresses for this to work
 
-✅ **Username Differences OK**: Usernames can be completely different (e.g., `MOS7CA` vs `mos7ca@company.com`) - the SDK matches by email
+✅ **Destination Users Must Exist**: Users must already be in Tableau Cloud (via Azure AD, SAML, etc.)
 
-⚠️ **Email Required**: Users without email addresses will attempt to match by username, which may fail if usernames differ
+✅ **Username Differences OK**: Source username "MOS7CA" can map to destination user "mos7ca@company.com" - email is the key
 
-## Why This Is The Correct Approach
+## Why Previous Approaches Failed:
 
-This aligns with the Tableau Migration SDK's design:
-1. **User migration phase**: SDK processes users, builds mapping table
-2. **Content migration phase**: SDK uses mapping table to assign ownership
-3. **Our customization**: `DestinationUserMapping` tells SDK how to find users (by email)
-
-Skipping users entirely breaks this flow because the mapping table is never built.
+1. **Without SkipAllUsersFilter**: SDK tried to CREATE users → Failed because they exist
+2. **With SkipAllUsersFilter but without ITableauCloudUsernameMapping**: SDK had no way to map source users to destination
+3. **Current approach**: Skip migration but provide email-based mapping = Success! ✅

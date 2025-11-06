@@ -5,26 +5,25 @@ using Microsoft.Extensions.Logging;
 using Tableau.Migration;
 using Tableau.Migration.Content;
 using Tableau.Migration.Engine.Hooks.Mappings;
+using Tableau.Migration.Engine.Hooks.Mappings.Default;
 using Tableau.Migration.Resources;
 
 namespace MigrationSDK.Hooks.Mappings
 {
     /// <summary>
-    /// Maps source users to destination users based on email address.
+    /// Maps source users to destination users based on email address for Tableau Cloud.
     /// 
-    /// This mapping handles cases where usernames differ between source and destination
-    /// (e.g., Server uses "MOS7CA", Cloud uses "mos7ca@company.com") but the email 
-    /// address remains the same on both platforms.
+    /// This mapping implements ITableauCloudUsernameMapping which tells the SDK to use
+    /// email addresses as usernames when assigning content ownership in Tableau Cloud.
     /// 
-    /// The SDK will use the email address to find the matching user at the destination,
-    /// ensuring content ownership is correctly maintained even when usernames change.
+    /// Users are NOT migrated - they already exist at the destination (via Azure AD).
+    /// This mapping only affects how content ownership is assigned.
     /// 
     /// Example:
     ///   Source User: Username="MOS7CA", Email="silvio.carvalho@company.com"
-    ///   Destination User: Username="mos7ca@company.com", Email="silvio.carvalho@company.com"
-    ///   Result: Content is correctly assigned to the destination user via email matching
+    ///   Result: Content owned by user with email="silvio.carvalho@company.com" at destination
     /// </summary>
-    public class DestinationUserMapping : ContentMappingBase<IUser>
+    public class DestinationUserMapping : ContentMappingBase<IUser>, ITableauCloudUsernameMapping
     {
         private readonly ILogger<IContentMapping<IUser>>? _logger;
 
@@ -41,31 +40,30 @@ namespace MigrationSDK.Hooks.Mappings
             CancellationToken cancel)
         {
             var sourceUser = ctx.ContentItem;
+            var domain = ctx.MappedLocation.Parent();
             
-            // Check if user has an email address
-            if (string.IsNullOrEmpty(sourceUser.Email))
+            // Use email as the username for Tableau Cloud
+            // This is the key: we're telling the SDK "when you need to reference this user,
+            // use their email address as the identifier"
+            if (!string.IsNullOrEmpty(sourceUser.Email))
             {
-                _logger?.LogWarning(
-                    "Source user {SourceUser} has no email address. Using username for mapping. " +
-                    "This may fail if the username differs at the destination.",
-                    sourceUser.Name);
+                _logger?.LogInformation(
+                    "Mapping source user {SourceUsername} to Tableau Cloud using email {Email}",
+                    sourceUser.Name,
+                    sourceUser.Email);
                 
-                // No email, use username (may fail if username differs at destination)
-                var usernameLocation = ContentLocation.ForUsername(sourceUser.Domain, sourceUser.Name);
-                return Task.FromResult<ContentMappingContext<IUser>?>(ctx.MapTo(usernameLocation));
+                // Map to email-based location
+                return Task.FromResult<ContentMappingContext<IUser>?>(
+                    ctx.MapTo(domain.Append(sourceUser.Email)));
             }
 
-            // Map based on email address - this works even when usernames differ
-            _logger?.LogInformation(
-                "Mapping source user {SourceUsername} (Email: {Email}) to destination user by email address",
-                sourceUser.Name,
-                sourceUser.Email);
-
-            // Use email for mapping - SDK will find the destination user with this email
-            // The destination username can be different (e.g., "mos7ca@company.com" vs "MOS7CA")
-            var emailLocation = ContentLocation.ForUsername(sourceUser.Domain, sourceUser.Email);
+            // Fallback to username if no email
+            _logger?.LogWarning(
+                "Source user {SourceUser} has no email address. Using username for mapping.",
+                sourceUser.Name);
             
-            return Task.FromResult<ContentMappingContext<IUser>?>(ctx.MapTo(emailLocation));
+            return Task.FromResult<ContentMappingContext<IUser>?>(
+                ctx.MapTo(domain.Append(sourceUser.Name)));
         }
     }
 }
